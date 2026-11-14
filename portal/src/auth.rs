@@ -16,9 +16,9 @@ use rand::RngCore;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use iaop_security::{JwtValidator, RemoteJwksProvider};
+use iaop_security::jwks::{JwtValidator, RemoteJwksProvider};
 
-use crate::{config::AppConfig, errors::PortalError, routes::AppState};
+use crate::{errors::PortalError, routes::AppState};
 
 pub const SESSION_COOKIE: &str = "portal_session";
 pub const FLOW_COOKIE: &str = "portal_oidc_flow";

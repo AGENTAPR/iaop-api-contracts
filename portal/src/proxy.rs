@@ -4,8 +4,8 @@
 use axum::{
     body::{to_bytes, Body},
     extract::{OriginalUri, State},
-    http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
-    response::{IntoResponse, Response},
+    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
+    response::Response,
     routing::any,
     Router,
 };
