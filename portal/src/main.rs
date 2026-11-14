@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = AppConfig::parse();
 
     info!(
-        "Starting IAOP Central OpenAPI Developer Portal on {}:{}",
+        "Starting IAOP Developer Portal v2 (Scalar) on {}:{}",
         config.host, config.port
     );
     info!("Loading catalog from {:?}", config.catalog_path);
@@ -27,9 +27,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         load_and_validate_catalog(&config.catalog_path, Some(&config.catalog_schema_path))?;
 
     info!(
-        "Catalog validated successfully! Registered {} services.",
+        "Catalog validated (schema v{}). {} services registered.",
+        catalog.schema_version,
         catalog.services.len()
     );
+
+    let cors_info = if config.allowed_cors_origins.iter().any(|o| !o.is_empty()) {
+        format!("{:?}", config.allowed_cors_origins)
+    } else {
+        "* (wildcard — dev mode)".to_string()
+    };
+    info!("CORS allowed origins: {}", cors_info);
 
     let state = AppState {
         config: config.clone(),
@@ -39,7 +47,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = build_router(state);
 
     let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
-    info!("Swagger UI available at http://{}/swagger-ui/", addr);
+    info!("Landing page: http://{}/", addr);
+    info!("Frontend APIs: http://{}/reference/frontend", addr);
+    info!("Backend APIs:  http://{}/reference/backend", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app)
