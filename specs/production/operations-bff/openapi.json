@@ -1,0 +1,105 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "IAOP Operations BFF API",
+    "version": "0.1.0",
+    "description": "Operations BFF - platform contract (draft).\n\nSTATUS: DRAFT scaffold contract. Domain endpoints are added as the\nservice is implemented; `iaop-api-contracts` standards apply\n(see /standards). Baseline endpoints reflect the deployed scaffold.\n"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "getHealthLive",
+        "summary": "Liveness probe",
+        "responses": {
+          "200": {
+            "description": "Process is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "getHealthReady",
+        "summary": "Readiness probe",
+        "responses": {
+          "200": {
+            "description": "Service is ready to serve traffic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ready"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependencies unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/system/info": {
+      "get": {
+        "operationId": "getSystemInfo",
+        "summary": "Service metadata",
+        "responses": {
+          "200": {
+            "description": "Service information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "service": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string"
+                    },
+                    "environment": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ProblemDetails": {
+        "$ref": "../../schemas/common/problem-details.schema.json"
+      }
+    }
+  }
+}

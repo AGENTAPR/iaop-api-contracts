@@ -1,0 +1,2808 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AGENA \u2014 Proposed Frontend API Contract (v1)",
+    "version": "1.0.0-draft",
+    "description": "Authoritative draft specification from AGENA_FRONTEND_API_CONTRACT_V1.md containing all 134 planned frontend endpoints across 20 functional groups.",
+    "contact": {
+      "name": "IAOP Agent Experience Team",
+      "email": "mr.icadj@gmail.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Local / Development BFF gateway prefix"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Identity & Workspace",
+      "description": "Session resolution, workspace switching, user preferences"
+    },
+    {
+      "name": "Today Dashboard",
+      "description": "Hero action prioritization, daily agenda, action tasks"
+    },
+    {
+      "name": "Utilities & Support",
+      "description": "Global search, notifications, support ticketing"
+    },
+    {
+      "name": "Recruitment",
+      "description": "Candidate pipelines and referral management"
+    },
+    {
+      "name": "Onboarding",
+      "description": "Agent onboarding tasks and submission"
+    },
+    {
+      "name": "Documents",
+      "description": "Two-step pre-signed upload and download intents"
+    },
+    {
+      "name": "Learning",
+      "description": "Training modules, enrollment, and progress tracking"
+    },
+    {
+      "name": "Certification",
+      "description": "Licensing evidence submission and tracking"
+    },
+    {
+      "name": "Agency",
+      "description": "Organizational tree and downline hierarchy"
+    },
+    {
+      "name": "Customers",
+      "description": "Customer list and profile with PII masking"
+    },
+    {
+      "name": "Sales & Products",
+      "description": "Product catalog, illustration calculation, and proposals"
+    },
+    {
+      "name": "Policies",
+      "description": "Policy servicing and detail retrieval"
+    },
+    {
+      "name": "Claims Assistance",
+      "description": "Claim intake assistance and status checking"
+    },
+    {
+      "name": "Earnings",
+      "description": "Commission summaries and payout statements"
+    },
+    {
+      "name": "Performance",
+      "description": "MDRT progress, targets, and agency rankings"
+    },
+    {
+      "name": "Operations & Status",
+      "description": "Restrictions, offboarding status, and workflow status"
+    },
+    {
+      "name": "Authentication & Session",
+      "description": "OIDC login, callback, logout, and session inspection"
+    },
+    {
+      "name": "System",
+      "description": "Liveness, readiness, and system metadata"
+    }
+  ],
+  "paths": {
+    "/me": {
+      "get": {
+        "tags": [
+          "Identity & Workspace"
+        ],
+        "summary": "Get authenticated agent profile and active workspace",
+        "operationId": "getMe",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces": {
+      "get": {
+        "tags": [
+          "Identity & Workspace"
+        ],
+        "summary": "List available workspaces for agent",
+        "operationId": "listWorkspaces",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/select": {
+      "post": {
+        "tags": [
+          "Identity & Workspace"
+        ],
+        "summary": "Select active agent workspace",
+        "operationId": "selectWorkspace",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspace_id"
+                ],
+                "properties": {
+                  "workspace_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/preferences": {
+      "get": {
+        "tags": [
+          "Identity & Workspace"
+        ],
+        "summary": "Get agent preferences",
+        "operationId": "getPreferences",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Identity & Workspace"
+        ],
+        "summary": "Update agent preferences",
+        "operationId": "updatePreferences",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "theme": {
+                    "type": "string"
+                  },
+                  "locale": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/today": {
+      "get": {
+        "tags": [
+          "Today Dashboard"
+        ],
+        "summary": "Get agent consolidated daily dashboard with Hero Action",
+        "operationId": "getTodayDashboard",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tasks": {
+      "get": {
+        "tags": [
+          "Today Dashboard"
+        ],
+        "summary": "List pending action tasks",
+        "operationId": "listTasks",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/tasks/{id}": {
+      "patch": {
+        "tags": [
+          "Today Dashboard"
+        ],
+        "summary": "Update action task status",
+        "operationId": "patchTask",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agenda": {
+      "get": {
+        "tags": [
+          "Today Dashboard"
+        ],
+        "summary": "Get today agenda and appointments",
+        "operationId": "getAgenda",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "tags": [
+          "Utilities & Support"
+        ],
+        "summary": "Global search across customers, proposals, policies",
+        "operationId": "globalSearch",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": [
+          "Utilities & Support"
+        ],
+        "summary": "List agent notifications",
+        "operationId": "listNotifications",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "unread_only",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ]
+      }
+    },
+    "/notifications/{id}/read": {
+      "post": {
+        "tags": [
+          "Utilities & Support"
+        ],
+        "summary": "Mark notification as read",
+        "operationId": "markNotificationRead",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/support/tickets": {
+      "get": {
+        "tags": [
+          "Utilities & Support"
+        ],
+        "summary": "List agent support tickets",
+        "operationId": "listSupportTickets",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Utilities & Support"
+        ],
+        "summary": "Create new support ticket",
+        "operationId": "createSupportTicket",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "category",
+                  "subject",
+                  "message"
+                ],
+                "properties": {
+                  "category": {
+                    "type": "string"
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/recruitment/candidates": {
+      "get": {
+        "tags": [
+          "Recruitment"
+        ],
+        "summary": "List candidate pipeline",
+        "operationId": "listCandidates",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Recruitment"
+        ],
+        "summary": "Submit candidate referral",
+        "operationId": "createCandidate",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "full_name",
+                  "email",
+                  "phone"
+                ],
+                "properties": {
+                  "full_name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/recruitment/my-referrals": {
+      "get": {
+        "tags": [
+          "Recruitment"
+        ],
+        "summary": "Get agent recruitment referrals summary",
+        "operationId": "getMyReferrals",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/onboarding/me": {
+      "get": {
+        "tags": [
+          "Onboarding"
+        ],
+        "summary": "Get agent self-onboarding checklist progress",
+        "operationId": "getOnboardingMe",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/onboarding/tasks/{id}/submit": {
+      "post": {
+        "tags": [
+          "Onboarding"
+        ],
+        "summary": "Submit onboarding task evidence",
+        "operationId": "submitOnboardingTask",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "document_key"
+                ],
+                "properties": {
+                  "document_key": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/upload-intent": {
+      "post": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Create pre-signed upload intent URL",
+        "operationId": "createUploadIntent",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "filename",
+                  "content_type",
+                  "purpose"
+                ],
+                "properties": {
+                  "filename": {
+                    "type": "string"
+                  },
+                  "content_type": {
+                    "type": "string"
+                  },
+                  "purpose": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/complete": {
+      "post": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Confirm completed document upload",
+        "operationId": "completeDocument",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "document_key"
+                ],
+                "properties": {
+                  "document_key": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/documents/{id}/download-intent": {
+      "get": {
+        "tags": [
+          "Documents"
+        ],
+        "summary": "Get pre-signed download intent URL",
+        "operationId": "getDownloadIntent",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/learning/courses": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "List academy courses and CPD modules",
+        "operationId": "listCourses",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/learning/courses/{id}/enroll": {
+      "post": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Enroll in academy course",
+        "operationId": "enrollCourse",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/learning/my-progress": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Get agent CPD credits and learning progress",
+        "operationId": "getMyLearningProgress",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/certifications/me": {
+      "get": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Get agent licenses and certifications status",
+        "operationId": "getCertificationsMe",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/certifications/evidence": {
+      "post": {
+        "tags": [
+          "Certification"
+        ],
+        "summary": "Submit certification renewal evidence",
+        "operationId": "submitCertificationEvidence",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "cert_type",
+                  "document_key"
+                ],
+                "properties": {
+                  "cert_type": {
+                    "type": "string"
+                  },
+                  "document_key": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agency/hierarchy": {
+      "get": {
+        "tags": [
+          "Agency"
+        ],
+        "summary": "Get agency organization hierarchy tree",
+        "operationId": "getAgencyHierarchy",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agency/my-team": {
+      "get": {
+        "tags": [
+          "Agency"
+        ],
+        "summary": "List agent downline team members",
+        "operationId": "getMyTeam",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customers": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "summary": "List agent customer accounts (PII masked)",
+        "operationId": "listCustomers",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Customers"
+        ],
+        "summary": "Create customer lead profile",
+        "operationId": "createCustomer",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "full_name",
+                  "email",
+                  "phone"
+                ],
+                "properties": {
+                  "full_name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/customers/{id}": {
+      "get": {
+        "tags": [
+          "Customers"
+        ],
+        "summary": "Get customer detail record",
+        "operationId": "getCustomerDetail",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": [
+          "Sales & Products"
+        ],
+        "summary": "List active insurance products with decimal string premiums",
+        "operationId": "listProducts",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/illustrations/calculate": {
+      "post": {
+        "tags": [
+          "Sales & Products"
+        ],
+        "summary": "Calculate benefit illustration",
+        "operationId": "calculateIllustration",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "product_code",
+                  "sum_assured",
+                  "policy_term_years"
+                ],
+                "properties": {
+                  "product_code": {
+                    "type": "string"
+                  },
+                  "sum_assured": {
+                    "type": "string",
+                    "example": "500000000.00"
+                  },
+                  "policy_term_years": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/proposals": {
+      "post": {
+        "tags": [
+          "Sales & Products"
+        ],
+        "summary": "Create insurance proposal submission",
+        "operationId": "createProposal",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "product_code",
+                  "customer_id",
+                  "premium_amount"
+                ],
+                "properties": {
+                  "product_code": {
+                    "type": "string"
+                  },
+                  "customer_id": {
+                    "type": "string"
+                  },
+                  "premium_amount": {
+                    "type": "string",
+                    "example": "15000000.00"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Sales & Products"
+        ],
+        "summary": "List agent proposals",
+        "operationId": "listProposals",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/policies": {
+      "get": {
+        "tags": [
+          "Policies"
+        ],
+        "summary": "List customer policies serviced by agent",
+        "operationId": "listPolicies",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/policies/{id}": {
+      "get": {
+        "tags": [
+          "Policies"
+        ],
+        "summary": "Get policy detail and schedule",
+        "operationId": "getPolicyDetail",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/claims": {
+      "get": {
+        "tags": [
+          "Claims Assistance"
+        ],
+        "summary": "List customer claims assisted by agent",
+        "operationId": "listClaims",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Claims Assistance"
+        ],
+        "summary": "Intake claim assistance submission",
+        "operationId": "createClaim",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "policy_id",
+                  "incident_date",
+                  "claim_type",
+                  "claimed_amount"
+                ],
+                "properties": {
+                  "policy_id": {
+                    "type": "string"
+                  },
+                  "incident_date": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "claim_type": {
+                    "type": "string"
+                  },
+                  "claimed_amount": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/claims/{id}": {
+      "get": {
+        "tags": [
+          "Claims Assistance"
+        ],
+        "summary": "Get claim assistance detail",
+        "operationId": "getClaimDetail",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/earnings/summary": {
+      "get": {
+        "tags": [
+          "Earnings"
+        ],
+        "summary": "Get agent earnings summary and pending payout",
+        "operationId": "getEarningsSummary",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/earnings/statements": {
+      "get": {
+        "tags": [
+          "Earnings"
+        ],
+        "summary": "List monthly commission statements",
+        "operationId": "listEarningsStatements",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/performance/metrics": {
+      "get": {
+        "tags": [
+          "Performance"
+        ],
+        "summary": "Get agent target KPIs and MDRT progress",
+        "operationId": "getPerformanceMetrics",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/performance/rankings": {
+      "get": {
+        "tags": [
+          "Performance"
+        ],
+        "summary": "Get agency leaderboard and rankings",
+        "operationId": "getPerformanceRankings",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/{id}": {
+      "get": {
+        "tags": [
+          "Operations & Status"
+        ],
+        "summary": "Get status of asynchronous operation",
+        "operationId": "getOperationStatus",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/me/offboarding-status": {
+      "get": {
+        "tags": [
+          "Operations & Status"
+        ],
+        "summary": "Get agent offboarding status",
+        "operationId": "getOffboardingStatus",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me/restrictions": {
+      "get": {
+        "tags": [
+          "Operations & Status"
+        ],
+        "summary": "Get active compliance and selling restrictions",
+        "operationId": "getRestrictions",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "get": {
+        "tags": [
+          "Authentication & Session"
+        ],
+        "summary": "Initiate OIDC Authorization Code + PKCE login flow",
+        "operationId": "authLogin",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "tags": [
+          "Authentication & Session"
+        ],
+        "summary": "OIDC OAuth2 callback receiver",
+        "operationId": "authCallback",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication & Session"
+        ],
+        "summary": "Revoke session and clear cookies",
+        "operationId": "authLogout",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "csrfToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "tags": [
+          "Authentication & Session"
+        ],
+        "summary": "Inspect current session TTL and CSRF token",
+        "operationId": "authSession",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/system/info": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Get service version and environment metadata",
+        "operationId": "systemInfo",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation wrapped in canonical frontend envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness probe",
+        "operationId": "getHealthLive",
+        "responses": {
+          "200": {
+            "description": "Process is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Readiness probe",
+        "operationId": "getHealthReady",
+        "responses": {
+          "200": {
+            "description": "Service is ready to serve traffic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "agena_session_id",
+        "description": "HttpOnly, Secure, SameSite=Lax session cookie issued upon OIDC callback"
+      },
+      "csrfToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-csrf-token",
+        "description": "Double-submit cryptographic CSRF token mandatory on all mutating HTTP methods (POST, PUT, PATCH, DELETE)"
+      }
+    },
+    "schemas": {
+      "ResponseMeta": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "timestamp"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "example": "req_01j7c3f..."
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_more": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "FeErrorBody": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "UNAUTHENTICATED",
+              "FORBIDDEN_WORKSPACE",
+              "FORBIDDEN_RESTRICTION",
+              "CSRF_TOKEN_INVALID",
+              "VALIDATION_FAILED",
+              "RESOURCE_NOT_FOUND",
+              "CONFLICT_STATE",
+              "UPSTREAM_UNAVAILABLE",
+              "RATE_LIMITED",
+              "PRECONDITION_FAILED",
+              "INTERNAL_ERROR",
+              "SELLING_NOT_ELIGIBLE"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        }
+      },
+      "StandardEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "object"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      },
+      "StandardErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error",
+          "meta"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/FeErrorBody"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        }
+      }
+    }
+  }
+}

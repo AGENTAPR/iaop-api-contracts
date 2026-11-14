@@ -1,0 +1,87 @@
+{
+  "environment": "development",
+  "publishedAt": "2026-11-14T06:30:35.203664Z",
+  "totalSpecs": 20,
+  "artifacts": {
+    "specs/development/agency-service/openapi.json": {
+      "bytes": 2865,
+      "sha256": "c763c74f6e7a92aacd0bf28b3d077e53b3156fd12eb073b49e86ebd4e90af070"
+    },
+    "specs/development/agent-bff-proposed/openapi.json": {
+      "bytes": 77951,
+      "sha256": "ef5b9ac120539f008a5e9e5e6b6f3b212e883a72436754d72b8b9e750c97ea6c"
+    },
+    "specs/development/agent-bff/openapi.json": {
+      "bytes": 77998,
+      "sha256": "75a2490c5495d9ac8914e868ac171eafa4c5e9c4e6fb94b03d3cfc6872ec2110"
+    },
+    "specs/development/agent-service/openapi.json": {
+      "bytes": 41438,
+      "sha256": "41fd88a5744f2b5bf5fad9330555e1b52c36142097c55a087ae3e8a33fa8b696"
+    },
+    "specs/development/api-gateway/openapi.json": {
+      "bytes": 2852,
+      "sha256": "93469a58ffafc572599fe8f43719fac2379529a2448ae4afb35c960e9152156f"
+    },
+    "specs/development/certification-service/openapi.json": {
+      "bytes": 2879,
+      "sha256": "7be0b9ef2c2a8eea68c36363623ad81a8b9e5c9fb23f4cdf5101db9c25099032"
+    },
+    "specs/development/commission-service/openapi.json": {
+      "bytes": 2873,
+      "sha256": "e84ff1ec124a0388baf57488883662cdf9683b89792eba14d9f9a13e0d6dc31e"
+    },
+    "specs/development/compliance-service/openapi.json": {
+      "bytes": 2873,
+      "sha256": "56813a6dc70314f95e669154c7e64f962db3fff7d16d5f13eaadc4db1235af54"
+    },
+    "specs/development/document-service/openapi.json": {
+      "bytes": 2862,
+      "sha256": "cda97739129be602b0423d8dbbbe6eadc40a08aa1b5b20415e8fe626edc309be"
+    },
+    "specs/development/eligibility-service/openapi.json": {
+      "bytes": 2875,
+      "sha256": "7dee86c1924bd566e22e5eb4c02a0293be16108cce5a8f8fee9a3be0759632e7"
+    },
+    "specs/development/integration-service/openapi.json": {
+      "bytes": 2868,
+      "sha256": "0fbd77d89bf7d091286b8c4dc06e184211339c8321a2dbb5479682bad6ec75ea"
+    },
+    "specs/development/learning-service/openapi.json": {
+      "bytes": 2869,
+      "sha256": "f922b3aebbc14aeda96e8424afe77b991e454d2dd7a490e54495e719b79334cc"
+    },
+    "specs/development/notification-service/openapi.json": {
+      "bytes": 2870,
+      "sha256": "df84a7c2f70a70e1502b975c82e1d8c98c5d0afceb0db0db4aedcddda3e09702"
+    },
+    "specs/development/onboarding-service/openapi.json": {
+      "bytes": 2873,
+      "sha256": "78cdf01699d449f6e6707d33e887b9fe8c497da4290970576130191e9b0fc5fe"
+    },
+    "specs/development/operations-bff/openapi.json": {
+      "bytes": 2858,
+      "sha256": "a3e7ef6b9c533357564bb1053013fe0ae587296214a0c01c18081e0e502b4ed4"
+    },
+    "specs/development/performance-service/openapi.json": {
+      "bytes": 2875,
+      "sha256": "c13e0daf09e292489cc7203277daa917cb3e6642393bb1002f749c91f93afec5"
+    },
+    "specs/development/portfolio-service/openapi.json": {
+      "bytes": 2871,
+      "sha256": "fa44f915fcff13caf90f42430826fd2aad61866300d67656af22bae91a55d46f"
+    },
+    "specs/development/recruitment-service/openapi.json": {
+      "bytes": 2875,
+      "sha256": "2367e90d2891683675cb42f935429206dda942fc4f4fdaac98f2cd711ee2dec2"
+    },
+    "specs/development/sales-service/openapi.json": {
+      "bytes": 2863,
+      "sha256": "695dcfa50cc95e9f3b6824db52ace4cf275db6a1472af2ed2fa64ff0670f456e"
+    },
+    "specs/development/workflow-service/openapi.json": {
+      "bytes": 2862,
+      "sha256": "05c9b296116224ff5a7a46373fe48d38a955b550b488daba25c11aa92f6fa7dd"
+    }
+  }
+}
