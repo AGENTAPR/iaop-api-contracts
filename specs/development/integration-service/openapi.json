@@ -1,33 +1,40 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "IAOP Integration Service API",
-    "version": "0.1.0",
-    "description": "Integration Service - platform contract (draft).\n\nSTATUS: DRAFT scaffold contract. Domain endpoints are added as the\nservice is implemented; `iaop-api-contracts` standards apply\n(see /standards). Baseline endpoints reflect the deployed scaffold.\n"
+    "title": "IAOP Integration Platform Service API",
+    "version": "1.0.0",
+    "description": "IAOP Integration Platform service API. Manages durable external operations, multi-provider connectors, HMAC-SHA256 webhooks, atomic leasing outbox dispatchers, and state reconciliation."
   },
   "servers": [
     {
-      "url": "/"
+      "url": "https://api-dev.iaop.internal/integration-service",
+      "description": "Development environment"
+    },
+    {
+      "url": "/",
+      "description": "Local / Direct ingress"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
     }
   ],
   "paths": {
     "/health/live": {
       "get": {
-        "operationId": "getHealthLive",
+        "tags": ["Health"],
         "summary": "Liveness probe",
+        "description": "Returns 200 OK if the integration service process is alive.",
+        "operationId": "getHealthLive",
+        "security": [],
         "responses": {
           "200": {
             "description": "Process is alive",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "ok"
-                    }
-                  }
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
@@ -37,55 +44,389 @@
     },
     "/health/ready": {
       "get": {
-        "operationId": "getHealthReady",
+        "tags": ["Health"],
         "summary": "Readiness probe",
+        "description": "Returns 200 OK if PostgreSQL store and background worker leases are operational.",
+        "operationId": "getHealthReady",
+        "security": [],
         "responses": {
           "200": {
-            "description": "Service is ready to serve traffic",
+            "description": "Service is ready to handle operations",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "ready"
-                    }
-                  }
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             }
           },
           "503": {
-            "description": "Dependencies unavailable"
+            "description": "Database or dependent subsystem unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/v1/system/info": {
       "get": {
+        "tags": ["System"],
+        "summary": "System metadata",
+        "description": "Returns service identifier, build version, environment, and uptime status.",
         "operationId": "getSystemInfo",
-        "summary": "Service metadata",
+        "security": [],
         "responses": {
           "200": {
-            "description": "Service information",
+            "description": "System metadata successfully returned",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "service": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "type": "string"
-                    },
-                    "environment": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string"
-                    }
+                  "$ref": "#/components/schemas/SystemInfoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/operations": {
+      "post": {
+        "tags": ["Operations"],
+        "summary": "Submit external integration operation",
+        "description": "Enqueues an asynchronous durable external operation with idempotency protection and atomic lease dispatch.",
+        "operationId": "submitOperation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitOperationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Operation accepted for dispatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid operation payload or missing parameters"
+          },
+          "409": {
+            "description": "Idempotency conflict (idempotency key matches a different payload fingerprint)"
+          },
+          "503": {
+            "description": "Persistence store unavailable"
+          }
+        }
+      },
+      "get": {
+        "tags": ["Operations"],
+        "summary": "List external integration operations",
+        "description": "Retrieves recent operations with optional filtering by tenant, provider, or status.",
+        "operationId": "listOperations",
+        "parameters": [
+          {
+            "name": "tenant_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by tenant ID"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by operation status"
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by provider identifier"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50
+            },
+            "description": "Maximum number of records to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of integration operations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OperationResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integration/operations/{id}": {
+      "get": {
+        "tags": ["Operations"],
+        "summary": "Get integration operation by ID",
+        "description": "Retrieves the current state, retry counter, external reference, and payload/result of an operation.",
+        "operationId": "getOperationById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Operation UUID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Operation not found"
+          }
+        }
+      }
+    },
+    "/api/v1/integration/operations/{id}/attempts": {
+      "get": {
+        "tags": ["Operations"],
+        "summary": "Get operation attempt history",
+        "description": "Returns all dispatch attempts, HTTP status codes, latency, and error codes for the given operation.",
+        "operationId": "getOperationAttempts",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Operation UUID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of dispatch attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttemptResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Operation not found"
+          }
+        }
+      }
+    },
+    "/api/v1/integration/operations/{id}/retry": {
+      "post": {
+        "tags": ["Operations"],
+        "summary": "Manual retry of an operation",
+        "description": "Forces an immediate retry transition for a failed or stuck operation, clearing retry timers and unsticking leases.",
+        "operationId": "retryOperation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Operation UUID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation rescheduled for dispatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Operation cannot be retried in its current state"
+          },
+          "404": {
+            "description": "Operation not found"
+          }
+        }
+      }
+    },
+    "/api/v1/integration/operations/{id}/reconcile": {
+      "post": {
+        "tags": ["Reconciliation"],
+        "summary": "Reconcile operation outcome",
+        "description": "Records an authoritative reconciliation resolution when external webhook or async confirmation status diverged.",
+        "operationId": "reconcileOperation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Operation UUID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reconciliation recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Operation not found"
+          }
+        }
+      }
+    },
+    "/api/v1/integration/callbacks/{provider}": {
+      "post": {
+        "tags": ["Callbacks"],
+        "summary": "Ingest provider webhook callback",
+        "description": "Receives external webhook callbacks with HMAC-SHA256 signature verification (X-Signature-SHA256), idempotently updating the related operation.",
+        "operationId": "receiveCallback",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Provider identifier (e.g., vida, peruri, faspay)"
+          },
+          {
+            "name": "X-Signature-SHA256",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Hex-encoded HMAC-SHA256 signature of request body"
+          },
+          {
+            "name": "X-Callback-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Unique provider callback delivery reference"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Callback successfully received and verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallbackResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing HMAC signature"
+          }
+        }
+      }
+    },
+    "/api/v1/integration/providers": {
+      "get": {
+        "tags": ["Providers"],
+        "summary": "List configured integration providers",
+        "description": "Returns active external integration providers, kinds, and health endpoints.",
+        "operationId": "listProviders",
+        "responses": {
+          "200": {
+            "description": "List of configured providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderResponseDto"
                   }
                 }
               }
@@ -96,9 +437,405 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Keycloak / OIDC Bearer JWT Token"
+      }
+    },
     "schemas": {
-      "ProblemDetails": {
-        "$ref": "../../schemas/common/problem-details.schema.json"
+      "HealthResponse": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "ok"
+          }
+        }
+      },
+      "SystemInfoResponse": {
+        "type": "object",
+        "required": ["service", "version", "environment", "status"],
+        "properties": {
+          "service": {
+            "type": "string",
+            "example": "iaop-integration-service"
+          },
+          "version": {
+            "type": "string",
+            "example": "0.1.0"
+          },
+          "environment": {
+            "type": "string",
+            "example": "development"
+          },
+          "status": {
+            "type": "string",
+            "example": "ok"
+          }
+        }
+      },
+      "SubmitOperationDto": {
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "requesting_service",
+          "provider",
+          "operation_type",
+          "business_reference",
+          "idempotency_key",
+          "payload"
+        ],
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "example": "tenant-default"
+          },
+          "requesting_service": {
+            "type": "string",
+            "example": "iaop-agent-service"
+          },
+          "provider": {
+            "type": "string",
+            "example": "vida"
+          },
+          "operation_type": {
+            "type": "string",
+            "example": "IDENTITY_VERIFICATION"
+          },
+          "business_reference": {
+            "type": "string",
+            "example": "AGENT-00123"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "example": "idem-uuid-001"
+          },
+          "payload": {
+            "type": "object",
+            "description": "Arbitrary provider-specific request payload"
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "causation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "max_attempts": {
+            "type": "integer",
+            "format": "int32",
+            "default": 5
+          }
+        }
+      },
+      "OperationResponseDto": {
+        "type": "object",
+        "required": [
+          "id",
+          "tenant_id",
+          "requesting_service",
+          "provider",
+          "operation_type",
+          "business_reference",
+          "idempotency_key",
+          "status",
+          "attempt_count",
+          "max_attempts",
+          "payload",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenant_id": {
+            "type": "string"
+          },
+          "requesting_service": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "operation_type": {
+            "type": "string"
+          },
+          "business_reference": {
+            "type": "string"
+          },
+          "idempotency_key": {
+            "type": "string"
+          },
+          "external_reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/OperationStatus"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "max_attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "next_retry_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "payload": {
+            "type": "object"
+          },
+          "result": {
+            "type": "object",
+            "nullable": true
+          },
+          "error_details": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "OperationStatus": {
+        "type": "string",
+        "enum": [
+          "ACCEPTED",
+          "PENDING",
+          "RUNNING",
+          "WAITING_EXTERNAL_CONFIRMATION",
+          "SUCCEEDED",
+          "FAILED_RETRYABLE",
+          "FAILED_FINAL",
+          "REQUIRES_REVIEW",
+          "CANCELLED"
+        ]
+      },
+      "AttemptResponseDto": {
+        "type": "object",
+        "required": [
+          "id",
+          "operation_id",
+          "attempt_number",
+          "dispatched_at",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "attempt_number": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dispatched_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/AttemptStatus"
+          },
+          "http_status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "error_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "error_message": {
+            "type": "string",
+            "nullable": true
+          },
+          "latency_ms": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          }
+        }
+      },
+      "AttemptStatus": {
+        "type": "string",
+        "enum": [
+          "DISPATCHED",
+          "SUCCESS",
+          "RETRYABLE_ERROR",
+          "TERMINAL_ERROR",
+          "TIMEOUT"
+        ]
+      },
+      "ProviderResponseDto": {
+        "type": "object",
+        "required": ["id", "name", "kind", "status", "base_url", "timeout_ms"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ProviderKind"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ProviderStatus"
+          },
+          "base_url": {
+            "type": "string"
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ProviderKind": {
+        "type": "string",
+        "enum": [
+          "IDENTITY_VERIFICATION",
+          "CREDENTIAL_VERIFICATION",
+          "CORE_INSURANCE",
+          "DOCUMENT_VERIFICATION",
+          "E_SIGNATURE",
+          "NOTIFICATION",
+          "PAYMENT",
+          "GENERIC"
+        ]
+      },
+      "ProviderStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "SUSPENDED",
+          "DEPRECATED"
+        ]
+      },
+      "CallbackResponseDto": {
+        "type": "object",
+        "required": ["callback_id", "provider", "status", "received_at"],
+        "properties": {
+          "callback_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CallbackStatus"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CallbackStatus": {
+        "type": "string",
+        "enum": [
+          "RECEIVED",
+          "VERIFIED",
+          "PROCESSED",
+          "REJECTED"
+        ]
+      },
+      "ReconcileRequestDto": {
+        "type": "object",
+        "required": ["outcome"],
+        "properties": {
+          "provider_status": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ReconciliationOutcome"
+          },
+          "details": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "ReconciliationOutcome": {
+        "type": "string",
+        "enum": [
+          "MATCHED_SUCCESS",
+          "MATCHED_FAILURE",
+          "STATE_CONFLICT",
+          "INCONCLUSIVE"
+        ]
+      },
+      "ReconcileResponseDto": {
+        "type": "object",
+        "required": [
+          "reconciliation_id",
+          "operation_id",
+          "checked_at",
+          "outcome"
+        ],
+        "properties": {
+          "reconciliation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "provider_status": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ReconciliationOutcome"
+          },
+          "details": {
+            "type": "string",
+            "nullable": true
+          }
+        }
       }
     }
   }

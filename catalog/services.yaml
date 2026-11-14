@@ -242,20 +242,19 @@ services:
   description: BPMN execution, human task assignment, approval transitions, and process
     history.
 - id: integration-service
-  name: "DEV / IAOP Integration Service \u2014 Proposed"
+  name: "DEV / IAOP Integration Service — Implemented"
   repository: AGENTAPR/iaop-integration-service
   environment: development
   visibility: restricted
-  maturity: proposed_contract
+  maturity: implemented_verified
   specPath: specs/development/integration-service/openapi.json
   sourceRef: development
-  sourceCommit: 2a94aaecb63170c4c6e88bf1c4cae9655c83ad67
-  apiVersion: 0.1.0
+  sourceCommit: e95a79011e4bf646db41d6dc79b47e85c13b6320
+  apiVersion: 1.0.0
   enabled: true
   domainOwner: Integration Platform Team
   serverUrl: https://api-dev.iaop.internal/integration-service
-  description: Core PAS adapters, payment gateways, e-KYC vendor connectors, and third-party
-    webhooks.
+  description: External operations, multi-provider connectors, HMAC-SHA256 callbacks, and state reconciliation (10 operations implemented & verified).
 - id: notification-service
   name: "DEV / IAOP Notification Service \u2014 Proposed"
   repository: AGENTAPR/iaop-notification-service
