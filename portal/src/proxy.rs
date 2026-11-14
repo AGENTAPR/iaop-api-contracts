@@ -31,6 +31,7 @@ const FORWARD_HEADERS: &[&str] = &[
 const RETURN_HEADERS: &[&str] = &[
     "content-type",
     "set-cookie",
+    "location",
     "cache-control",
     "x-request-id",
     "www-authenticate",
