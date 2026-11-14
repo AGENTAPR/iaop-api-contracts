@@ -12,7 +12,7 @@ services:
   apiVersion: 1.0.0
   enabled: true
   domainOwner: Agent Platform & Experience Team
-  serverUrl: https://api-dev.iaop.internal/agent-bff
+  serverUrl: https://8082-agq5lpbszgbva3ygddcbarv6ea.instabox.tech
   description: AGENA Insurance Agent Lifecycle Platform BFF - Complete verified implementation
     covering 52 endpoints across Identity, Today Dashboard, Sales, Documents, and
     Earnings.
