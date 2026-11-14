@@ -1,7 +1,14 @@
 use crate::errors::PortalError;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path};
-use utoipa_swagger_ui::Url;
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs,
+    path::Path,
+};
+
+// ---------------------------------------------------------------------------
+// Core catalog types
+// ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,9 +25,11 @@ pub struct ServiceEntry {
     pub repository: String,
     pub environment: String,
     pub visibility: String,
+    /// Legacy maturity field — kept for backward compatibility.
     pub maturity: String,
     pub spec_path: String,
     pub source_ref: String,
+    #[serde(default)]
     pub source_commit: Option<String>,
     pub api_version: String,
     pub enabled: bool,
@@ -30,24 +39,88 @@ pub struct ServiceEntry {
     pub server_url: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
+
+    // ---- V2 fields --------------------------------------------------------
+    /// "frontend" | "backend"
+    #[serde(default)]
+    pub catalog: Option<String>,
+    /// "agent" | "office" | "customer" | "shared" | "platform"
+    #[serde(default)]
+    pub channel: Option<String>,
+    #[serde(default)]
+    pub bounded_context: Option<String>,
+    /// "active" | "proposed" | "deprecated" | "blocked"
+    #[serde(default)]
+    pub lifecycle: Option<String>,
+    /// "implemented_verified" | "implemented_unverified" | "proposed" | "not_started"
+    #[serde(default)]
+    pub implementation_status: Option<String>,
+    /// "deployed" | "not_deployed" | "unknown"
+    #[serde(default)]
+    pub deployment_status: Option<String>,
+    /// "e2e_verified" | "unit_verified" | "not_verified" | "unknown"
+    #[serde(default)]
+    pub verification_status: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// V2 dual-catalog response types
+// ---------------------------------------------------------------------------
+
+/// A group of services within one catalog section (e.g. a bounded context).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogGroup {
+    pub id: String,
+    pub label: String,
+    pub services: Vec<ServiceEntry>,
+}
+
+/// Top-level dual-catalog API response separating frontend and backend services.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DualCatalogResponse {
+    pub schema_version: u32,
+    pub frontend: Vec<CatalogGroup>,
+    pub backend: Vec<CatalogGroup>,
+}
+
+// ---------------------------------------------------------------------------
+// Scalar integration types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScalarConfig {
+    pub spec: ScalarSpecRef,
+    pub service_meta: ServiceMeta,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SwaggerUrlItem {
-    pub name: String,
+pub struct ScalarSpecRef {
     pub url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SwaggerConfigDto {
-    pub urls: Vec<SwaggerUrlItem>,
-    #[serde(rename = "urls.primaryName")]
-    pub primary_name: String,
-    pub supported_submit_methods: Vec<String>,
-    pub query_config_enabled: bool,
-    pub validator_url: String,
+pub struct ServiceMeta {
+    pub id: String,
+    pub name: String,
+    pub lifecycle: String,
+    pub catalog: String,
+    pub bounded_context: Option<String>,
+    pub channel: Option<String>,
+    pub api_version: String,
+    pub repository: String,
+    pub domain_owner: Option<String>,
+    pub description: Option<String>,
+    pub server_url: Option<String>,
+    pub maturity: String,
 }
+
+// ---------------------------------------------------------------------------
+// Catalog loading & validation
+// ---------------------------------------------------------------------------
 
 /// Loads and validates the service catalog from disk.
 pub fn load_and_validate_catalog(
@@ -75,7 +148,7 @@ pub fn load_and_validate_catalog(
         .map_err(|e| PortalError::Catalog(format!("Failed to parse catalog YAML: {}", e)))?;
 
     // Check for unique service IDs
-    let mut seen_ids = std::collections::HashSet::new();
+    let mut seen_ids = HashSet::new();
     for s in &catalog.services {
         if !seen_ids.insert(&s.id) {
             return Err(PortalError::Catalog(format!(
@@ -118,107 +191,164 @@ pub fn validate_catalog_schema(raw_yaml: &str, schema_path: &Path) -> Result<(),
     Ok(())
 }
 
-/// Builds the Swagger UI dropdown configuration matching Section 11.
-pub fn build_swagger_urls(
-    catalog: &ServiceCatalog,
-    environment: &str,
-    allowed_visibility: &[String],
-) -> Vec<Url<'static>> {
-    let mut eligible: Vec<&ServiceEntry> = catalog
+// ---------------------------------------------------------------------------
+// V2 dual catalog builder
+// ---------------------------------------------------------------------------
+
+fn service_sort_rank(s: &ServiceEntry) -> u8 {
+    let lc = s.lifecycle.as_deref().unwrap_or("proposed");
+    let im = s.implementation_status.as_deref().unwrap_or(&s.maturity);
+    if lc == "active" || im == "implemented_verified" {
+        0
+    } else if im == "implemented_unverified" {
+        1
+    } else {
+        2
+    }
+}
+
+/// Builds the dual-catalog response separating frontend and backend services.
+/// Services are filtered to `enabled == true` and the given `environment`.
+/// Backend services are grouped by `bounded_context`; frontend services by `channel`.
+pub fn build_dual_catalog(catalog: &ServiceCatalog, environment: &str) -> DualCatalogResponse {
+    let eligible: Vec<&ServiceEntry> = catalog
         .services
         .iter()
-        .filter(|s| {
-            s.enabled
-                && s.environment.eq_ignore_ascii_case(environment)
-                && allowed_visibility
-                    .iter()
-                    .any(|v| v.eq_ignore_ascii_case(&s.visibility))
-        })
+        .filter(|s| s.enabled && s.environment.eq_ignore_ascii_case(environment))
         .collect();
 
-    // Sort deterministically: implemented_verified first, then name
-    eligible.sort_by(|a, b| {
-        let a_rank = if a.maturity == "implemented_verified" {
-            0
-        } else if a.maturity == "implemented_unverified" {
-            1
-        } else {
-            2
-        };
-        let b_rank = if b.maturity == "implemented_verified" {
-            0
-        } else if b.maturity == "implemented_unverified" {
-            1
-        } else {
-            2
-        };
-        a_rank.cmp(&b_rank).then_with(|| a.name.cmp(&b.name))
-    });
+    // ----- Frontend -----
+    let frontend_services: Vec<&ServiceEntry> = eligible
+        .iter()
+        .filter(|s| s.catalog.as_deref() == Some("frontend"))
+        .copied()
+        .collect();
 
-    eligible
+    // Group frontend by channel label
+    let mut fe_groups: BTreeMap<String, Vec<&ServiceEntry>> = BTreeMap::new();
+    for s in &frontend_services {
+        let group_key = s.channel.clone().unwrap_or_else(|| "other".to_string());
+        fe_groups.entry(group_key).or_default().push(s);
+    }
+
+    let mut frontend: Vec<CatalogGroup> = fe_groups
         .into_iter()
-        .map(|s| {
-            let name: &'static str = Box::leak(s.name.clone().into_boxed_str());
-            let spec_url: &'static str = Box::leak(format!("/{}", s.spec_path).into_boxed_str());
-            Url::new(name, spec_url)
+        .map(|(key, mut svcs)| {
+            svcs.sort_by(|a, b| {
+                service_sort_rank(a)
+                    .cmp(&service_sort_rank(b))
+                    .then_with(|| a.name.cmp(&b.name))
+            });
+            let label = channel_label(&key);
+            CatalogGroup {
+                id: key,
+                label,
+                services: svcs.into_iter().cloned().collect(),
+            }
         })
+        .collect();
+    frontend.sort_by_key(|g| g.id.clone());
+
+    // ----- Backend -----
+    let backend_services: Vec<&ServiceEntry> = eligible
+        .iter()
+        .filter(|s| s.catalog.as_deref().unwrap_or("backend") == "backend")
+        .copied()
+        .collect();
+
+    // Group backend by bounded_context
+    let mut be_groups: BTreeMap<String, Vec<&ServiceEntry>> = BTreeMap::new();
+    for s in &backend_services {
+        let group_key = s
+            .bounded_context
+            .clone()
+            .unwrap_or_else(|| "Platform".to_string());
+        be_groups.entry(group_key).or_default().push(s);
+    }
+
+    let mut backend: Vec<CatalogGroup> = be_groups
+        .into_iter()
+        .map(|(key, mut svcs)| {
+            svcs.sort_by(|a, b| {
+                service_sort_rank(a)
+                    .cmp(&service_sort_rank(b))
+                    .then_with(|| a.name.cmp(&b.name))
+            });
+            CatalogGroup {
+                id: slugify(&key),
+                label: key,
+                services: svcs.into_iter().cloned().collect(),
+            }
+        })
+        .collect();
+    backend.sort_by_key(|g| g.label.clone());
+
+    DualCatalogResponse {
+        schema_version: catalog.schema_version,
+        frontend,
+        backend,
+    }
+}
+
+fn channel_label(channel: &str) -> String {
+    match channel {
+        "agent" => "Agent Channel".to_string(),
+        "office" => "Operations / Back Office".to_string(),
+        "customer" => "Customer Channel".to_string(),
+        "shared" => "Shared".to_string(),
+        "platform" => "Platform".to_string(),
+        other => other.to_string(),
+    }
+}
+
+fn slugify(s: &str) -> String {
+    s.to_lowercase()
+        .replace(' ', "-")
+        .replace('&', "and")
+        .replace('/', "-")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '-')
         .collect()
 }
 
-/// Builds the JSON configuration object for frontend inspection.
-pub fn build_swagger_config_dto(
+// ---------------------------------------------------------------------------
+// Scalar config builder
+// ---------------------------------------------------------------------------
+
+/// Looks up a service by ID in the catalog and returns a Scalar configuration
+/// for it. Returns `None` if the service is not found or not enabled for `environment`.
+pub fn build_scalar_config(
     catalog: &ServiceCatalog,
+    service_id: &str,
     environment: &str,
-    allowed_visibility: &[String],
-) -> SwaggerConfigDto {
-    let mut eligible: Vec<&ServiceEntry> = catalog
-        .services
-        .iter()
-        .filter(|s| {
-            s.enabled
-                && s.environment.eq_ignore_ascii_case(environment)
-                && allowed_visibility
-                    .iter()
-                    .any(|v| v.eq_ignore_ascii_case(&s.visibility))
-        })
-        .collect();
+) -> Option<ScalarConfig> {
+    let entry = catalog.services.iter().find(|s| {
+        s.id == service_id && s.enabled && s.environment.eq_ignore_ascii_case(environment)
+    })?;
 
-    eligible.sort_by(|a, b| {
-        let a_rank = if a.maturity == "implemented_verified" {
-            0
-        } else if a.maturity == "implemented_unverified" {
-            1
-        } else {
-            2
-        };
-        let b_rank = if b.maturity == "implemented_verified" {
-            0
-        } else if b.maturity == "implemented_unverified" {
-            1
-        } else {
-            2
-        };
-        a_rank.cmp(&b_rank).then_with(|| a.name.cmp(&b.name))
-    });
+    let spec_url = format!("/{}", entry.spec_path);
 
-    let url_items: Vec<SwaggerUrlItem> = eligible
-        .into_iter()
-        .map(|s| SwaggerUrlItem {
-            name: s.name.clone(),
-            url: format!("/{}", s.spec_path),
-        })
-        .collect();
-
-    let primary = url_items
-        .first()
-        .map(|u| u.name.clone())
-        .unwrap_or_else(|| "No Services Available".to_string());
-
-    SwaggerConfigDto {
-        urls: url_items,
-        primary_name: primary,
-        supported_submit_methods: vec![], // Section 16: Try it out disabled
-        query_config_enabled: false,      // Section 16: Prevent arbitrary remote URL loading
-        validator_url: "none".to_string(), // Section 25: Offline validator disabled
-    }
+    Some(ScalarConfig {
+        spec: ScalarSpecRef { url: spec_url },
+        service_meta: ServiceMeta {
+            id: entry.id.clone(),
+            name: entry.name.clone(),
+            lifecycle: entry
+                .lifecycle
+                .clone()
+                .unwrap_or_else(|| "proposed".to_string()),
+            catalog: entry
+                .catalog
+                .clone()
+                .unwrap_or_else(|| "backend".to_string()),
+            bounded_context: entry.bounded_context.clone(),
+            channel: entry.channel.clone(),
+            api_version: entry.api_version.clone(),
+            repository: entry.repository.clone(),
+            domain_owner: entry.domain_owner.clone(),
+            description: entry.description.clone(),
+            server_url: entry.server_url.clone(),
+            maturity: entry.maturity.clone(),
+        },
+    })
 }

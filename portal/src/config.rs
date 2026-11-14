@@ -4,7 +4,7 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Parser)]
 #[command(
     name = "iaop-developer-portal",
-    about = "Centralized Swagger UI & Enterprise OpenAPI Developer Portal for IAOP"
+    about = "IAOP Central OpenAPI Developer Portal v2 — Scalar UI, dual-catalog, schema v2"
 )]
 pub struct AppConfig {
     #[arg(short, long, env = "PORT", default_value = "8080")]
@@ -39,6 +39,24 @@ pub struct AppConfig {
 
     #[arg(long, env = "PUBLIC_BASE_URL")]
     pub public_base_url: Option<String>,
+
+    /// Comma-separated list of allowed CORS origins.
+    /// Leave empty to allow any origin (development only).
+    #[arg(
+        long,
+        env = "ALLOWED_CORS_ORIGINS",
+        default_value = "",
+        value_delimiter = ','
+    )]
+    pub allowed_cors_origins: Vec<String>,
+
+    /// Path to the bundled Scalar JS file.
+    #[arg(
+        long,
+        env = "SCALAR_JS_PATH",
+        default_value = "/app/static/scalar.min.js"
+    )]
+    pub scalar_js_path: PathBuf,
 }
 
 impl Default for AppConfig {
@@ -56,6 +74,8 @@ impl Default for AppConfig {
                 "restricted".to_string(),
             ],
             public_base_url: None,
+            allowed_cors_origins: vec![],
+            scalar_js_path: PathBuf::from("/app/static/scalar.min.js"),
         }
     }
 }
