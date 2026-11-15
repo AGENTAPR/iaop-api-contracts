@@ -86,6 +86,7 @@ pub async fn security_headers_middleware(
             "default-src 'self'; \
              script-src 'self'; \
              style-src 'self' 'unsafe-inline'; \
+             font-src 'self' https://fonts.scalar.com; \
              img-src 'self' data:; \
              connect-src 'self'; \
              worker-src 'none'; \

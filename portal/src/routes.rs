@@ -45,7 +45,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/auth/callback", get(auth::callback))
         .route("/auth/session", get(auth::session_info))
         .route("/auth/me", get(auth::me))
-        .route("/auth/logout", post(auth::logout));
+        .route("/auth/logout", post(auth::logout))
+        .route("/favicon.ico", get(favicon));
 
     // Protected routes: everything that exposes catalog, documentation,
     // specs, or the Scalar UI requires an authenticated portal session.
@@ -180,6 +181,10 @@ async fn serve_scalar_js(State(state): State<AppState>) -> Result<Response, Port
 // ---------------------------------------------------------------------------
 // Health probes
 // ---------------------------------------------------------------------------
+
+async fn favicon() -> impl IntoResponse {
+    StatusCode::NO_CONTENT
+}
 
 async fn health_live() -> impl IntoResponse {
     Json(serde_json::json!({
