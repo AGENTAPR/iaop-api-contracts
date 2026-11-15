@@ -68,16 +68,16 @@ services:
   repository: AGENTAPR/iaop-agency-service
   environment: development
   visibility: internal
-  maturity: implemented_unverified
+  maturity: implemented_verified
   catalog: backend
   boundedContext: Agent & Distribution
   lifecycle: active
-  implementationStatus: implemented_unverified
+  implementationStatus: implemented_verified
   deploymentStatus: deployed
-  verificationStatus: unit_verified
+  verificationStatus: e2e_verified
   specPath: specs/development/agency-service/openapi.json
   sourceRef: development
-  sourceCommit: 08057281a15a77c55ec4bf7bb2473c583f4592a6
+  sourceCommit: a57afbb3c859f4286f76a7c236abf7acb0c59bd8
   apiVersion: 0.2.0
   enabled: true
   domainOwner: Agency Hierarchy Team
