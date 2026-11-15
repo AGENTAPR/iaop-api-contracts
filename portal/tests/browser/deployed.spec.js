@@ -111,12 +111,12 @@ const consoleErrors = [];
   // BFF reference in dark mode — portal theme toggle flips data-theme;
   // ADL scalar-overrides re-skin Scalar's CSS vars live.
   const bgBefore = await page.evaluate(() =>
-    getComputedStyle(document.documentElement).getPropertyValue('--scalar-background-1').trim());
+    getComputedStyle(document.body).getPropertyValue('--scalar-background-1').trim());
   await page.click('[data-theme-toggle]');
   await page.waitForTimeout(600);
   await page.screenshot({ path: OUT + '/08-bff-ref-dark.png', fullPage: false });
   const bgAfter = await page.evaluate(() =>
-    getComputedStyle(document.documentElement).getPropertyValue('--scalar-background-1').trim());
+    getComputedStyle(document.body).getPropertyValue('--scalar-background-1').trim());
   check('scalar surface re-themed', bgBefore !== bgAfter && bgAfter.length > 0, bgBefore + ' → ' + bgAfter);
   await page.click('[data-theme-toggle]');
   await page.waitForTimeout(300);
