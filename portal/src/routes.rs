@@ -7,7 +7,7 @@ use axum::{
     Json, Router,
 };
 use std::{fs, sync::Arc};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 
 use crate::{
     auth,
@@ -98,19 +98,26 @@ pub fn build_router(state: AppState) -> Router {
 fn build_cors(origins: &[String]) -> CorsLayer {
     let non_empty: Vec<&String> = origins.iter().filter(|o| !o.is_empty()).collect();
     if non_empty.is_empty() {
-        // Development fallback — allow any origin
+        // No CORS origins configured: same-origin only (browser default).
+        // Wildcard CORS is never permitted for authenticated routes because
+        // it cannot be combined with Allow-Credentials and would expose
+        // session-gated content to cross-origin scripts.
         CorsLayer::new()
-            .allow_origin(Any)
-            .allow_methods([Method::GET, Method::OPTIONS])
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
     } else {
+        // Explicit allowlist from configuration — validate at startup.
         let parsed: Vec<HeaderValue> = non_empty
             .iter()
-            .filter_map(|o| o.parse::<HeaderValue>().ok())
+            .filter_map(|o| {
+                o.parse::<HeaderValue>()
+                    .map_err(|e| tracing::warn!("Invalid CORS origin {o:?}: {e}"))
+                    .ok()
+            })
             .collect();
         CorsLayer::new()
             .allow_origin(parsed)
-            .allow_methods([Method::GET, Method::OPTIONS])
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION])
     }
 }

@@ -307,29 +307,43 @@ pub async fn callback(
         return Err(PortalError::Security("OIDC nonce mismatch".into()));
     }
 
-    // Realm roles: Keycloak emits `realm_access.roles` on the access token
-    // (the roles client scope's realm-role mapper does not populate the ID
-    // token in this realm). The access token arrives directly from the token
-    // endpoint over TLS in the same response as the validated id_token, so
-    // decoding its payload for role claims is safe; authorization decisions
-    // never rely on an unvalidated token.
-    let extract_roles = |payload: &serde_json::Value| -> Vec<String> {
-        payload["realm_access"]["roles"]
-            .as_array()
-            .map(|a| {
-                a.iter()
-                    .filter_map(|v| v.as_str().map(str::to_string))
-                    .collect()
-            })
-            .unwrap_or_default()
-    };
-    let mut roles = extract_roles(&raw);
+    // Realm roles: fetched from Keycloak's UserInfo endpoint using the
+    // access token as a Bearer credential. Keycloak validates the access
+    // token server-side before returning claims, so only verified roles
+    // are accepted. We never trust the access token payload decoded without
+    // signature verification.
+    let userinfo_url = format!("{issuer}/protocol/openid-connect/userinfo");
+    let mut roles: Vec<String> = Vec::new();
     if let Some(access_token) = body["access_token"].as_str() {
-        if let Some(access_raw) = jsonwebtoken_decode_payload(access_token) {
-            for role in extract_roles(&access_raw) {
-                if !roles.contains(&role) {
-                    roles.push(role);
+        match http
+            .get(&userinfo_url)
+            .bearer_auth(access_token)
+            .send()
+            .await
+        {
+            Ok(ui_resp) if ui_resp.status().is_success() => {
+                if let Ok(ui_claims) = ui_resp.json::<serde_json::Value>().await {
+                    // Verify the UserInfo sub matches the id_token sub (required by OIDC spec).
+                    if ui_claims["sub"].as_str() != Some(claims.sub.as_str()) {
+                        return Err(PortalError::Security(
+                            "UserInfo sub mismatch with id_token".into(),
+                        ));
+                    }
+                    // Extract realm roles from verified UserInfo response.
+                    if let Some(realm_roles) = ui_claims["realm_access"]["roles"].as_array() {
+                        roles = realm_roles
+                            .iter()
+                            .filter_map(|v| v.as_str().map(str::to_string))
+                            .collect();
+                    }
                 }
+            }
+            Ok(_) => {
+                // UserInfo returned non-success: treat as no roles (fail closed).
+                tracing::warn!("UserInfo endpoint returned non-success; portal roles will be empty");
+            }
+            Err(e) => {
+                tracing::warn!("UserInfo endpoint unreachable: {e}; portal roles will be empty");
             }
         }
     }
@@ -411,7 +425,40 @@ pub async fn me(
 }
 
 /// POST /auth/logout — invalidate portal session.
+///
+/// CSRF protection: validates that the request Origin matches the configured
+/// public base URL. Cross-origin logout requests are rejected with 403.
+/// Only the portal-local session is invalidated; Keycloak SSO sessions remain
+/// active unless the client separately calls the Keycloak end_session endpoint.
 pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    // Origin check: reject cross-origin logout attempts (CSRF protection).
+    let allowed_origin = state
+        .config
+        .public_base_url
+        .as_deref()
+        .unwrap_or("http://localhost");
+    // Trim trailing slash for comparison.
+    let allowed_origin = allowed_origin.trim_end_matches('/');
+    let request_origin = headers
+        .get(header::ORIGIN)
+        .or_else(|| headers.get(header::REFERER))
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    // A missing Origin on a same-site form POST is acceptable only when
+    // Referer is also absent (strict browser) — allow it only if no cross-
+    // origin evidence is present.
+    let origin_ok = request_origin.is_empty()
+        || request_origin.starts_with(allowed_origin);
+    if !origin_ok {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({
+                "error": {"code": "CSRF_REJECTED", "message": "Cross-origin logout rejected"}
+            })),
+        )
+            .into_response();
+    }
+
     if let Some(sid) = read_cookie(&headers, SESSION_COOKIE) {
         state.auth_store.drop_session(sid);
     }
