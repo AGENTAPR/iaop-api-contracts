@@ -414,6 +414,7 @@ fn scalar_html(meta: &crate::catalog::ServiceMeta, spec_url: &str) -> String {
       <script id="api-reference" data-url="{url}" data-configuration='{config}'></script>
       <script src="/static/scripts/theme-sync.js"></script>
       <script src="/static/scripts/theme.js" defer></script>
+      <script src="/static/scripts/portal.js" defer></script>
       {connect_script}
       <script src="/static/scalar.min.js"></script>
     </div>
