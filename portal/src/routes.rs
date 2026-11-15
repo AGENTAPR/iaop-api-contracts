@@ -371,11 +371,11 @@ fn scalar_html(meta: &crate::catalog::ServiceMeta, spec_url: &str) -> String {
         .unwrap_or_default();
 
     // Scalar bootstrap config. theme-sync.js rewrites darkMode from the
-    // portal theme before scalar.min.js executes; "auto" is the no-JS
+    // portal theme before scalar.min.js executes; false is the safe
     // fallback. hideDarkModeToggle keeps a single theme control (ours).
     let scalar_config = serde_json::json!({
         "theme": "default",
-        "darkMode": "auto",
+        "darkMode": false,
         "hideDarkModeToggle": true,
         "hideClientButton": true,
     });
