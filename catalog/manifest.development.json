@@ -7,10 +7,6 @@
       "bytes": 2865,
       "sha256": "c763c74f6e7a92aacd0bf28b3d077e53b3156fd12eb073b49e86ebd4e90af070"
     },
-    "specs/development/agent-bff-proposed/openapi.json": {
-      "bytes": 77951,
-      "sha256": "ef5b9ac120539f008a5e9e5e6b6f3b212e883a72436754d72b8b9e750c97ea6c"
-    },
     "specs/development/agent-bff/openapi.json": {
       "bytes": 77998,
       "sha256": "75a2490c5495d9ac8914e868ac171eafa4c5e9c4e6fb94b03d3cfc6872ec2110"
