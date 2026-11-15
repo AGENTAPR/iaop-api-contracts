@@ -72,9 +72,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/specs/{*spec_path}", get(serve_spec_file))
         // Bundled Scalar JS (served from filesystem, immutable cache)
         .route("/static/scalar.min.js", get(serve_scalar_js))
-        // Portal UI assets (embedded at compile time — same-origin, CSP-safe)
-        .route("/static/portal.css", get(serve_portal_css))
-        .route("/static/portal.js", get(serve_portal_js))
+        // Portal UI assets (embedded at compile time — same-origin, CSP-safe).
+        // Allowlist of ADL stylesheets and scripts; anything else is 404.
+        .route("/static/{*asset}", get(serve_static_asset))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_session,
@@ -130,31 +130,42 @@ fn build_cors(origins: &[String]) -> CorsLayer {
 // Static assets
 // ---------------------------------------------------------------------------
 
-async fn serve_portal_css() -> impl IntoResponse {
-    (
-        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
-        [(
-            header::CACHE_CONTROL,
-            "public, max-age=300, must-revalidate",
-        )],
-        PORTAL_CSS,
-    )
-        .into_response()
+/// Embedded ADL/portal assets keyed by their public /static/ path.
+/// Only allowlisted files are served — the wildcard route cannot escape
+/// this map, so there is no path-traversal surface.
+fn static_asset(path: &str) -> Option<(&'static str, &'static str)> {
+    match path {
+        "styles/adl-tokens.css" => Some(("text/css; charset=utf-8", ADL_TOKENS_CSS)),
+        "styles/portal.css" => Some(("text/css; charset=utf-8", PORTAL_CSS)),
+        "styles/scalar-overrides.css" => {
+            Some(("text/css; charset=utf-8", SCALAR_OVERRIDES_CSS))
+        }
+        "scripts/theme-init.js" => {
+            Some(("application/javascript; charset=utf-8", THEME_INIT_JS))
+        }
+        "scripts/theme.js" => Some(("application/javascript; charset=utf-8", THEME_JS)),
+        "scripts/theme-sync.js" => {
+            Some(("application/javascript; charset=utf-8", THEME_SYNC_JS))
+        }
+        "scripts/portal.js" => Some(("application/javascript; charset=utf-8", PORTAL_JS)),
+        _ => None,
+    }
 }
 
-async fn serve_portal_js() -> impl IntoResponse {
-    (
-        [(
-            header::CONTENT_TYPE,
-            "application/javascript; charset=utf-8",
-        )],
+async fn serve_static_asset(
+    Path(asset): Path<String>,
+) -> Result<impl IntoResponse, PortalError> {
+    let (content_type, body) = static_asset(&asset)
+        .ok_or_else(|| PortalError::NotFound(format!("Unknown static asset '{asset}'")))?;
+    Ok((
+        [(header::CONTENT_TYPE, content_type)],
         [(
             header::CACHE_CONTROL,
             "public, max-age=300, must-revalidate",
         )],
-        PORTAL_JS,
+        body,
     )
-        .into_response()
+        .into_response())
 }
 
 async fn serve_scalar_js(State(state): State<AppState>) -> Result<Response, PortalError> {
@@ -217,7 +228,12 @@ async fn swagger_compat_redirect() -> impl IntoResponse {
 // ---------------------------------------------------------------------------
 
 async fn landing_page() -> impl IntoResponse {
-    Html(LANDING_PAGE_HTML)
+    Html(landing_html())
+}
+
+/// Landing shell with the shared ADL header injected server-side.
+fn landing_html() -> String {
+    LANDING_PAGE_HTML.replacen("{header}", &portal_header_html("overview"), 1)
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +252,7 @@ async fn frontend_index(State(state): State<AppState>) -> impl IntoResponse {
     if let Some(svc) = first {
         Redirect::temporary(&format!("/reference/frontend/{}", svc.id)).into_response()
     } else {
-        Html(LANDING_PAGE_HTML).into_response()
+        Html(landing_html()).into_response()
     }
 }
 
@@ -266,7 +282,7 @@ async fn backend_index(State(state): State<AppState>) -> impl IntoResponse {
     if let Some(svc) = first {
         Redirect::temporary(&format!("/reference/backend/{}", svc.id)).into_response()
     } else {
-        Html(LANDING_PAGE_HTML).into_response()
+        Html(landing_html()).into_response()
     }
 }
 
@@ -315,21 +331,27 @@ fn scalar_html(meta: &crate::catalog::ServiceMeta, spec_url: &str) -> String {
     let safe_url = html_escape(spec_url);
     let catalog_kind = meta.catalog.as_str();
     let section = if catalog_kind == "frontend" {
-        "Frontend"
+        "Frontend APIs"
     } else {
-        "Backend"
+        "Backend APIs"
     };
     let ref_base = if catalog_kind == "frontend" {
         "/reference/frontend"
     } else {
         "/reference/backend"
     };
-    let auth_note = if catalog_kind == "frontend" {
-        "Testing via BFF session cookie + CSRF — connect through the BFF login flow."
+    let kind_label = if catalog_kind == "frontend" {
+        "Application-facing BFF contract"
     } else {
-        "Testing via OAuth2 Authorization Code + PKCE (client iaop-scalar-dev)."
+        "Domain service contract"
+    };
+    let auth_note = if catalog_kind == "frontend" {
+        "API testing: BFF session cookie + CSRF via the BFF login flow"
+    } else {
+        "API testing: OAuth2 Authorization Code + PKCE (client iaop-scalar-dev)"
     };
     let safe_section = html_escape(section);
+    let safe_kind_label = html_escape(kind_label);
     let safe_auth_note = html_escape(auth_note);
     let status_bits: Vec<String> = [
         meta.implementation_status.as_deref(),
@@ -345,47 +367,58 @@ fn scalar_html(meta: &crate::catalog::ServiceMeta, spec_url: &str) -> String {
     let description = meta
         .description
         .as_deref()
-        .map(|d| format!("<div class=\"ref-desc\">{}</div>", html_escape(d)))
+        .map(|d| format!("<span class=\"ref-desc\">{}</span>", html_escape(d)))
         .unwrap_or_default();
 
+    // Scalar bootstrap config. theme-sync.js rewrites darkMode from the
+    // portal theme before scalar.min.js executes; "auto" is the no-JS
+    // fallback. hideDarkModeToggle keeps a single theme control (ours).
+    let scalar_config = serde_json::json!({
+        "theme": "default",
+        "darkMode": "auto",
+        "hideDarkModeToggle": true,
+        "hideClientButton": true,
+    });
+    let safe_config = html_escape(&scalar_config.to_string());
+    let title = format!("{} — IAOP Developer Portal", meta.name);
+
     format!(
-        r#"<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <title>{name} — IAOP Developer Portal</title>
-  <link rel="stylesheet" href="/static/portal.css" />
-</head>
+        r#"{head}
 <body>
-<div class="ref-shell">
-  <div class="ref-bar">
-    <a href="/">← Catalog</a>
-    <span class="sep">/</span>
-    <a href="{ref_base}">{section}</a>
-    <span class="sep">/</span>
-    <span class="svc-name">{name}</span>
-    <span class="tag tag-version">{api_version}</span>
-    {status_html}
-    <span class="auth-note">{auth_note}</span>
+{header}
+  <div class="ref-shell">
+    <div class="ref-context">
+      <a href="/">Catalog</a>
+      <span class="sep">/</span>
+      <a href="{ref_base}">{section}</a>
+      <span class="sep">/</span>
+      <span class="ref-title">{name}</span>
+      <span class="tag tag-version">{api_version}</span>
+      {status_html}
+      <span class="ref-kind">{kind_label}</span>
+      {description}
+      <span class="auth-note">{auth_note}</span>
+    </div>
+    <div class="ref-body">
+      <script id="api-reference" data-url="{url}" data-configuration='{config}'></script>
+      <script src="/static/scripts/theme-sync.js"></script>
+      <script src="/static/scripts/theme.js" defer></script>
+      <script src="/static/scalar.min.js"></script>
+    </div>
   </div>
-  {description}
-  <div class="ref-body">
-    <script id="api-reference" data-url="{url}"></script>
-    <script src="/static/scalar.min.js"></script>
-  </div>
-</div>
-</body>
-</html>"#,
+</body></html>"#,
+        head = html_head(&title),
+        header = portal_header_html("reference"),
         name = safe_name,
         url = safe_url,
         ref_base = ref_base,
         section = safe_section,
         api_version = api_version,
         status_html = status_html,
+        kind_label = safe_kind_label,
         auth_note = safe_auth_note,
         description = description,
+        config = safe_config,
     )
 }
 
@@ -655,13 +688,91 @@ fn transform_spec_for_testing(state: &AppState, spec_path: &str, raw: &[u8]) -> 
 // strict CSP `script-src 'self'` is preserved with no 'unsafe-inline').
 // ---------------------------------------------------------------------------
 
-static PORTAL_CSS: &str = include_str!("../static/portal.css");
-static PORTAL_JS: &str = include_str!("../static/portal.js");
+static ADL_TOKENS_CSS: &str = include_str!("../static/styles/adl-tokens.css");
+static PORTAL_CSS: &str = include_str!("../static/styles/portal.css");
+static SCALAR_OVERRIDES_CSS: &str = include_str!("../static/styles/scalar-overrides.css");
+static THEME_INIT_JS: &str = include_str!("../static/scripts/theme-init.js");
+static THEME_JS: &str = include_str!("../static/scripts/theme.js");
+static THEME_SYNC_JS: &str = include_str!("../static/scripts/theme-sync.js");
+static PORTAL_JS: &str = include_str!("../static/scripts/portal.js");
 
 // ---------------------------------------------------------------------------
-// Landing page HTML shell — all catalog rendering happens in portal.js,
-// which builds DOM nodes only (no innerHTML) from /api/v1/catalog.
+// Shared ADL page chrome — header/nav/session controls used by both the
+// catalog landing page and every Scalar reference page.
 // ---------------------------------------------------------------------------
+
+/// Renders the sticky portal header. `active` is "overview" | "frontend" |
+/// "backend" | "reference" and controls aria-current on the nav links.
+fn portal_header_html(active: &str) -> String {
+    let nav_link = |href: &str, label: &str, key: &str| -> String {
+        let current = if active == key { " aria-current=\"page\"" } else { "" };
+        format!(
+            "<a href=\"{href}\"{current}>{label}</a>",
+            href = html_escape(href),
+            label = html_escape(label),
+            current = current,
+        )
+    };
+    format!(
+        r#"<header class="portal-header">
+  <div class="portal-header-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">A</span>
+      <span>IAOP Developer Portal</span>
+      <span class="brand-sub">Agena</span>
+    </a>
+    <span class="env-badge"><span id="env-name">DEV</span></span>
+    <nav class="portal-nav" aria-label="Portal">
+      {overview}
+      {frontend}
+      {backend}
+    </nav>
+    <div class="portal-header-actions">
+      <span class="user-chip" title="Portal session">
+        <span class="session-dot" aria-hidden="true"></span>
+        <span class="user-name" id="user-name">Signed in</span>
+      </span>
+      <button type="button" class="theme-toggle" data-theme-toggle aria-pressed="false" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <button type="button" class="logout-btn" id="logout-btn">Sign out</button>
+    </div>
+  </div>
+</header>"#,
+        overview = nav_link("/", "Overview", "overview"),
+        frontend = nav_link("/#frontend-apis", "Frontend APIs", "frontend"),
+        backend = nav_link("/#backend-apis", "Backend APIs", "backend"),
+    )
+}
+
+/// Shared <head> prelude: charset, viewport, ADL tokens + portal styles,
+/// synchronous theme bootstrap (sets data-theme before first paint).
+fn html_head(title: &str) -> String {
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <title>{title}</title>
+  <link rel="stylesheet" href="/static/styles/adl-tokens.css" />
+  <link rel="stylesheet" href="/static/styles/portal.css" />
+  <link rel="stylesheet" href="/static/styles/scalar-overrides.css" />
+  <script src="/static/scripts/theme-init.js"></script>
+</head>"#,
+        title = html_escape(title),
+    )
+}
+
+/// Deferred theme wiring + optional extra scripts, closed before </body>.
+fn html_tail(extra_scripts: &str) -> String {
+    format!(
+        "<script src=\"/static/scripts/theme.js\" defer></script>{extra}</body></html>",
+        extra = extra_scripts,
+    )
+}
 
 static LANDING_PAGE_HTML: &str = r#"<!DOCTYPE html>
 <html lang="en">
@@ -669,32 +780,44 @@ static LANDING_PAGE_HTML: &str = r#"<!DOCTYPE html>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <title>IAOP Developer Portal</title>
-  <link rel="stylesheet" href="/static/portal.css" />
+  <title>IAOP Developer Portal — Agena</title>
+  <link rel="stylesheet" href="/static/styles/adl-tokens.css" />
+  <link rel="stylesheet" href="/static/styles/portal.css" />
+  <script src="/static/scripts/theme-init.js"></script>
 </head>
 <body>
-  <div class="portal-header">
-    <a class="brand" href="/">IAOP Developer Portal</a>
-    <span class="env-badge">DEV</span>
-    <nav>
-      <span class="session-state" id="session-note">Signed in</span>
-    </nav>
-  </div>
+  {header}
   <main class="portal-main">
-    <div class="page-intro">
-      <h1>API Catalog</h1>
-      <p>Frontend BFF contracts and backend domain-service contracts for the IAOP platform. Select a service to open its Scalar API reference.</p>
-    </div>
+    <section class="hero" aria-labelledby="hero-title">
+      <h1 id="hero-title">Explore the Agena Platform</h1>
+      <p>Discover APIs, inspect contracts, and securely test integrations across the IAOP insurance agent platform.</p>
+    </section>
 
-    <div class="section-title">Frontend APIs <span class="count" id="frontend-count"></span></div>
-    <div id="frontend-groups" aria-live="polite"></div>
+    <section class="catalog-section" id="frontend-apis" aria-labelledby="frontend-title">
+      <h2 class="section-title" id="frontend-title">
+        <span>Frontend APIs</span>
+        <span class="count" id="frontend-count"></span>
+      </h2>
+      <p class="section-desc">Application-facing BFF contracts — what agent, office, and customer clients actually consume. Browser session + CSRF for API testing.</p>
+      <div id="frontend-groups" aria-live="polite"></div>
+    </section>
 
-    <div class="section-title">Backend APIs <span class="count" id="backend-count"></span></div>
-    <div id="backend-sections" aria-live="polite"></div>
+    <section class="catalog-section" id="backend-apis" aria-labelledby="backend-title">
+      <h2 class="section-title" id="backend-title">
+        <span>Backend APIs</span>
+        <span class="count" id="backend-count"></span>
+      </h2>
+      <p class="section-desc">Authoritative domain and platform service contracts, grouped by bounded context. OAuth2 Authorization Code + PKCE for API testing.</p>
+      <div id="backend-sections" aria-live="polite"></div>
+    </section>
   </main>
+  <footer class="portal-footer">
+    IAOP Developer Portal · Agena · environment <span class="mono" id="env-footer">development</span>
+  </footer>
   <noscript>
     <div class="portal-main"><div class="state-box">JavaScript is required to render the API catalog.</div></div>
   </noscript>
-  <script src="/static/portal.js" defer></script>
+  <script src="/static/scripts/theme.js" defer></script>
+  <script src="/static/scripts/portal.js" defer></script>
 </body>
 </html>"#;

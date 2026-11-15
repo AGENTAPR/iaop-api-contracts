@@ -1,12 +1,11 @@
-/* IAOP Developer Portal — catalog renderer.
-   Served same-origin at /static/portal.js (CSP: script-src 'self').
+/* IAOP Developer Portal — catalog renderer + session chrome.
+   Served same-origin at /static/scripts/portal.js (CSP: script-src 'self').
    All catalog data is rendered via DOM APIs — no innerHTML, no injection. */
 (function () {
   'use strict';
 
   var FRONTEND_GRID = document.getElementById('frontend-groups');
   var BACKEND_SECTIONS = document.getElementById('backend-sections');
-  if (!FRONTEND_GRID && !BACKEND_SECTIONS) return;
 
   var state = { loaded: false, error: null };
 
@@ -23,8 +22,8 @@
 
   function implTag(status) {
     switch (status) {
-      case 'implemented_verified': return tag('tag-implemented', 'implemented ✓');
-      case 'implemented_unverified': return tag('tag-unverified', 'implemented');
+      case 'implemented_verified': return tag('tag-implemented', 'implemented');
+      case 'implemented_unverified': return tag('tag-unverified', 'implemented · unverified');
       case 'proposed':
       case 'not_started': return tag('tag-proposed', 'proposed');
       default: return tag('tag-proposed', status || 'unknown');
@@ -48,7 +47,7 @@
   function lifecycleTag(lifecycle) {
     return lifecycle === 'active'
       ? tag('tag-implemented', 'active')
-      : tag('tag-proposed', lifecycle || 'planned');
+      : tag('tag-proposed', lifecycle === 'planned' ? 'planned' : (lifecycle || 'planned'));
   }
 
   function truncate(s, n) {
@@ -80,10 +79,12 @@
     nameWrap.appendChild(el('div', 'card-name', svc.name || svc.id));
     nameWrap.appendChild(el('div', 'card-repo', svc.repository || ''));
     top.appendChild(nameWrap);
-    top.appendChild(lifecycleTag(svc.lifecycle));
+    var life = lifecycleTag(svc.lifecycle);
+    life.classList.add('card-lifecycle');
+    top.appendChild(life);
     card.appendChild(top);
 
-    card.appendChild(el('div', 'card-desc', truncate(svc.description, 180)));
+    card.appendChild(el('div', 'card-desc', truncate(svc.description, 200)));
 
     var meta = el('div', 'card-meta');
     meta.appendChild(tag(catalogKind === 'frontend' ? 'tag-frontend' : 'tag-backend',
@@ -103,63 +104,55 @@
     if (svc.domainOwner) context.push(svc.domainOwner);
     if (context.length) card.appendChild(el('div', 'card-context', context.join(' · ')));
 
+    card.appendChild(el('div', 'card-cta',
+      planned ? 'Not yet available' : 'Open API reference →'));
+
     return card;
   }
 
   function makeGroupLabel(text, count) {
     var g = el('div', 'group-label', text);
-    if (typeof count === 'number') g.appendChild(el('span', null, ' · ' + count + ' services'));
+    if (typeof count === 'number') {
+      var suffix = el('span', null, ' · ' + count + (count === 1 ? ' service' : ' services'));
+      suffix.style.color = 'var(--agena-text-tertiary)';
+      suffix.style.fontWeight = '500';
+      g.appendChild(suffix);
+    }
     return g;
   }
 
-  function renderFrontend(groups) {
-    if (!FRONTEND_GRID) return;
-    FRONTEND_GRID.textContent = '';
+  function renderSection(node, groups, catalogKind, emptyMsg) {
+    if (!node) return;
+    node.textContent = '';
     var total = 0;
     (groups || []).forEach(function (group) {
       var svcs = group.services || [];
       total += svcs.length;
-      FRONTEND_GRID.appendChild(makeGroupLabel(group.label || group.id, svcs.length));
+      node.appendChild(makeGroupLabel(group.label || group.id, svcs.length));
       var grid = el('div', 'grid');
-      svcs.forEach(function (svc) { grid.appendChild(makeCard(svc, 'frontend')); });
-      FRONTEND_GRID.appendChild(grid);
+      svcs.forEach(function (svc) { grid.appendChild(makeCard(svc, catalogKind)); });
+      node.appendChild(grid);
     });
-    updateCount('frontend-count', total);
     if (total === 0) {
-      FRONTEND_GRID.appendChild(el('div', 'state-box', 'No frontend APIs published for this environment.'));
+      var box = el('div', 'state-box');
+      box.appendChild(el('div', 'state-title', 'Nothing published yet'));
+      box.appendChild(el('div', 'state-detail', emptyMsg));
+      node.appendChild(box);
     }
-  }
-
-  function renderBackend(groups) {
-    if (!BACKEND_SECTIONS) return;
-    BACKEND_SECTIONS.textContent = '';
-    var total = 0;
-    (groups || []).forEach(function (group) {
-      var svcs = group.services || [];
-      total += svcs.length;
-      BACKEND_SECTIONS.appendChild(makeGroupLabel(group.label || group.id, svcs.length));
-      var grid = el('div', 'grid');
-      svcs.forEach(function (svc) { grid.appendChild(makeCard(svc, 'backend')); });
-      BACKEND_SECTIONS.appendChild(grid);
-    });
-    updateCount('backend-count', total);
-    if (total === 0) {
-      BACKEND_SECTIONS.appendChild(el('div', 'state-box', 'No backend APIs published for this environment.'));
-    }
-  }
-
-  function updateCount(id, n) {
-    var node = document.getElementById(id);
-    if (node) node.textContent = n;
+    return total;
   }
 
   function showError(err) {
     state.error = err;
+    var message = 'Failed to load the API catalog.';
+    var detail = err && err.message ? err.message : 'network error';
     [FRONTEND_GRID, BACKEND_SECTIONS].forEach(function (node) {
       if (!node) return;
       node.textContent = '';
       var box = el('div', 'state-box error');
-      box.appendChild(el('div', null, 'Failed to load the API catalog: ' + (err && err.message ? err.message : 'network error')));
+      box.setAttribute('role', 'alert');
+      box.appendChild(el('div', 'state-title', 'Catalog unavailable'));
+      box.appendChild(el('div', 'state-detail', message + ' ' + detail));
       var retry = el('button', 'retry', 'Retry');
       retry.type = 'button';
       retry.addEventListener('click', function () { load(); });
@@ -168,13 +161,18 @@
     });
   }
 
+  function skeleton(node) {
+    if (!node) return;
+    node.textContent = '';
+    var grid = el('div', 'grid');
+    for (var i = 0; i < 3; i++) grid.appendChild(el('div', 'skeleton'));
+    node.appendChild(grid);
+  }
+
   function load() {
     if (!state.loaded) {
-      [FRONTEND_GRID, BACKEND_SECTIONS].forEach(function (node) {
-        if (!node) return;
-        node.textContent = '';
-        for (var i = 0; i < 3; i++) node.appendChild(el('div', 'skeleton'));
-      });
+      skeleton(FRONTEND_GRID);
+      skeleton(BACKEND_SECTIONS);
     }
     fetch('/api/v1/catalog', {
       headers: { 'Accept': 'application/json' },
@@ -187,8 +185,14 @@
       .then(function (catalog) {
         state.loaded = true;
         state.error = null;
-        renderFrontend(catalog.frontend);
-        renderBackend(catalog.backend);
+        var feTotal = renderSection(FRONTEND_GRID, catalog.frontend, 'frontend',
+          'No frontend BFF contracts are published for this environment.');
+        var beTotal = renderSection(BACKEND_SECTIONS, catalog.backend, 'backend',
+          'No backend domain APIs are published for this environment.');
+        setCount('frontend-count', feTotal);
+        setCount('backend-count', beTotal);
+        var env = document.getElementById('env-name');
+        if (env) env.textContent = catalog.environment || 'development';
         var sessionNote = document.getElementById('session-note');
         if (sessionNote) {
           sessionNote.textContent = 'Signed in · ' + (catalog.environment || 'development');
@@ -197,5 +201,41 @@
       .catch(function (err) { showError(err); });
   }
 
-  load();
+  function setCount(id, n) {
+    var node = document.getElementById(id);
+    if (node) node.textContent = n == null ? '' : String(n);
+  }
+
+  /* ---- Session chrome: user chip + logout ---- */
+
+  function initSession() {
+    var nameNode = document.getElementById('user-name');
+    var logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', function () {
+        logoutBtn.disabled = true;
+        fetch('/auth/logout', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Accept': 'application/json' }
+        }).then(function () {
+          window.location.href = '/auth/login';
+        }).catch(function () {
+          logoutBtn.disabled = false;
+        });
+      });
+    }
+    fetch('/auth/me', { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (me) {
+        if (me && nameNode) {
+          var name = me.displayName || me.name || me.preferred_username || me.email || me.sub;
+          if (name) nameNode.textContent = name;
+        }
+      })
+      .catch(function () { /* anonymous or expired — header still renders */ });
+  }
+
+  initSession();
+  if (FRONTEND_GRID || BACKEND_SECTIONS) load();
 })();
