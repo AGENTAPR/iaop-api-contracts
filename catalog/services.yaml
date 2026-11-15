@@ -57,7 +57,7 @@ services:
   verificationStatus: unit_verified
   specPath: specs/development/agent-service/openapi.json
   sourceRef: development
-  sourceCommit: cdfa423
+  sourceCommit: 8f9f1685faea35c8590a26f01b02706dfaf9c0b2
   apiVersion: 1.0.0
   enabled: true
   domainOwner: Agent Core Domain Team
@@ -77,7 +77,7 @@ services:
   verificationStatus: unit_verified
   specPath: specs/development/agency-service/openapi.json
   sourceRef: development
-  sourceCommit: d9f22ce
+  sourceCommit: b76ece802cbb0137c440ba1fecbe21bfecb4a2c9
   apiVersion: 0.1.0
   enabled: true
   domainOwner: Agency Hierarchy Team
