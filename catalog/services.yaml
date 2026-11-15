@@ -77,7 +77,7 @@ services:
   verificationStatus: unit_verified
   specPath: specs/development/agency-service/openapi.json
   sourceRef: development
-  sourceCommit: b76ece802cbb0137c440ba1fecbe21bfecb4a2c9
+  sourceCommit: 8105a5095837644273ef2f308cab0ca2860a24f4
   apiVersion: 0.1.0
   enabled: true
   domainOwner: Agency Hierarchy Team
