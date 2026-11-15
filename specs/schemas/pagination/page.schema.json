@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.iaop.internal/schemas/pagination/page.schema.json",
+  "title": "Offset Page Envelope",
+  "type": "object",
+  "required": ["items", "page", "size"],
+  "properties": {
+    "items": {"type": "array"},
+    "page": {"type": "integer", "minimum": 1},
+    "size": {"type": "integer", "minimum": 1, "maximum": 200},
+    "total": {"type": ["integer", "null"], "minimum": 0}
+  },
+  "additionalProperties": false
+}
