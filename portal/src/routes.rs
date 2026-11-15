@@ -14,7 +14,7 @@ use crate::{
     catalog::{build_dual_catalog, build_scalar_config, ServiceCatalog},
     config::AppConfig,
     errors::PortalError,
-    proxy::proxy_router,
+    proxy::{bff_session_router, proxy_router},
     security::{sanitize_path, security_headers_middleware},
 };
 
@@ -80,15 +80,25 @@ pub fn build_router(state: AppState) -> Router {
             auth::require_session,
         ));
 
-    // API-testing proxy: requires session AND the portal-api-tester role.
+    // API-execution proxy: requires session AND the portal-api-tester role.
+    // Policy: PortalApiTester.
     let proxy = proxy_router().route_layer(middleware::from_fn_with_state(
         state.clone(),
         auth::require_api_tester,
     ));
 
+    // BFF session-establishment routes: exact allowlist, portal session only
+    // (Policy: PortalAuthenticated). The BFF enforces its own OIDC
+    // state/nonce/PKCE/browser-binding checks and CSRF on logout.
+    let bff_session = bff_session_router().route_layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth::require_session,
+    ));
+
     Router::new()
         .merge(public)
         .merge(protected)
+        .merge(bff_session)
         .merge(proxy)
         .layer(middleware::from_fn(security_headers_middleware))
         .layer(cors)

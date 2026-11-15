@@ -360,6 +360,140 @@ async fn auth_endpoints_never_redirect_into_middleware() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// BFF session-establishment vs API-execution authorization split
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn bff_login_requires_portal_session_not_tester_role() {
+    let state = setup_state();
+    // Authenticated portal user WITHOUT portal-api-tester role.
+    session(&state, "viewer-bff", vec![]);
+    let app = build_router(state);
+
+    // BFF login bootstrap is PortalAuthenticated: the request must pass the
+    // portal auth layer and reach the upstream (which fails in test env ->
+    // 5xx, proving it was NOT blocked by 401/403).
+    for uri in [
+        "/agent-bff/auth/login?return_to=%2F",
+        "/agent-bff/auth/callback?code=x&state=y",
+        "/agent-bff/auth/session",
+        "/agent-bff/auth/me",
+    ] {
+        let res = app
+            .clone()
+            .oneshot({
+                let mut r = req(uri);
+                r.headers_mut().insert(
+                    header::COOKIE,
+                    "portal_session=viewer-bff".parse().unwrap(),
+                );
+                r
+            })
+            .await
+            .unwrap();
+        assert!(
+            res.status().is_server_error() || res.status().is_redirection(),
+            "{uri} should reach upstream, got {}",
+            res.status()
+        );
+    }
+
+    // But actual BFF API execution still requires the tester role -> 403.
+    let res = app
+        .clone()
+        .oneshot({
+            let mut r = req("/agent-bff/api/v1/me");
+            r.headers_mut().insert(
+                header::COOKIE,
+                "portal_session=viewer-bff".parse().unwrap(),
+            );
+            r
+        })
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn anonymous_bff_login_denied_but_html_nav_redirects() {
+    let app = build_router(setup_state());
+    // fetch/XHR-style request (no HTML accept) -> JSON 401.
+    let res = app
+        .clone()
+        .oneshot(req("/agent-bff/auth/login"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+    // Browser navigation -> 303 into portal login with return_to preserved.
+    let res = app
+        .clone()
+        .oneshot(req_html("/agent-bff/auth/login?return_to=%2Freference%2Ffrontend%2Fagent-bff"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::SEE_OTHER);
+    let loc = location_of(&res);
+    assert!(loc.starts_with("/auth/login?return_to="), "loc={loc}");
+    assert!(loc.contains("agent-bff"), "loc={loc}");
+}
+
+#[tokio::test]
+async fn bff_auth_subpaths_are_not_allowlisted() {
+    let state = setup_state();
+    session(&state, "tester-bff", vec!["portal-api-tester"]);
+    let app = build_router(state);
+
+    // /agent-bff/auth/session/extra and similar are NOT session routes —
+    // they fall through to the tester-gated wildcard. With a tester session
+    // they reach upstream; the important guarantee is they never bypass
+    // PortalApiTester for non-testers (covered above). Verify the exact
+    // allowlist does not accidentally match prefixes: a non-tester gets 403.
+    let state2 = setup_state();
+    session(&state2, "viewer-bff2", vec![]);
+    let app2 = build_router(state2);
+    for uri in [
+        "/agent-bff/auth/session/extra",
+        "/agent-bff/auth",
+        "/agent-bff/authentication/login",
+        "/agent-bff/me",
+    ] {
+        let res = app2
+            .clone()
+            .oneshot({
+                let mut r = req(uri);
+                r.headers_mut().insert(
+                    header::COOKIE,
+                    "portal_session=viewer-bff2".parse().unwrap(),
+                );
+                r
+            })
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN, "{uri}");
+    }
+    // Sanity: tester session on same paths reaches upstream (not 403).
+    let res = app
+        .clone()
+        .oneshot({
+            let mut r = req("/agent-bff/auth/session/extra");
+            r.headers_mut().insert(
+                header::COOKIE,
+                "portal_session=tester-bff".parse().unwrap(),
+            );
+            r
+        })
+        .await
+        .unwrap();
+    assert!(
+        res.status().is_server_error()
+            || res.status().is_success()
+            || res.status() == StatusCode::NOT_FOUND,
+        "tester should reach upstream, got {}",
+        res.status()
+    );
+}
+
 #[tokio::test]
 async fn non_html_methods_do_not_redirect() {
     let app = build_router(setup_state());

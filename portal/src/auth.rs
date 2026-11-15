@@ -503,6 +503,17 @@ fn is_html_page_path(path: &str) -> bool {
         || path.starts_with("/reference/")
         || path == "/reference"
         || path.starts_with("/swagger-ui")
+        // BFF session-establishment endpoints are browser navigations too —
+        // an unauthenticated browser hitting them should enter portal login
+        // (with return_to) rather than receive a bare JSON 401. Exact paths
+        // only: arbitrary /agent-bff/* API paths still get JSON 401/403.
+        || matches!(
+            path,
+            "/agent-bff/auth/login"
+                | "/agent-bff/auth/callback"
+                | "/agent-bff/auth/session"
+                | "/agent-bff/auth/me"
+        )
 }
 
 /// Axum middleware: require a valid portal session.
@@ -625,12 +636,21 @@ mod tests {
         assert!(is_html_page_path("/reference/frontend/agent-bff"));
         assert!(is_html_page_path("/reference/backend"));
         assert!(is_html_page_path("/swagger-ui"));
+        // BFF session-establishment GET endpoints are browser navigations.
+        assert!(is_html_page_path("/agent-bff/auth/login"));
+        assert!(is_html_page_path("/agent-bff/auth/callback"));
+        assert!(is_html_page_path("/agent-bff/auth/session"));
+        assert!(is_html_page_path("/agent-bff/auth/me"));
         for api in [
             "/api/v1/catalog",
             "/specs/development/agent-bff/openapi.json",
             "/static/scripts/portal.js",
             "/dev-api/agent/api/v1/agents",
             "/agent-bff/api/v1/me",
+            "/agent-bff/auth",      // not an exact allowlisted path
+            "/agent-bff/auth/login/extra",
+            "/agent-bff/auth/session/anything",
+            "/agent-bff/me",
             "/auth/login",
             "/health/live",
         ] {

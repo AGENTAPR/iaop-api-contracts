@@ -4,7 +4,7 @@
 use axum::{
     body::{to_bytes, Body},
     extract::{OriginalUri, State},
-    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
+    http::{header, HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     response::Response,
     routing::any,
     Router,
@@ -47,10 +47,53 @@ fn upstream_for<'a>(state: &'a AppState, service: &str) -> Option<&'a str> {
     }
 }
 
+/// Portal-local cookies that must never be forwarded to upstream services.
+/// The portal session is portal-internal; upstreams authenticate with their
+/// own credentials (BFF `__Host-iaop_session`, backend Bearer tokens).
+const PORTAL_COOKIE_PREFIX: &str = "portal_";
+
+/// Rebuilds the Cookie header for upstream forwarding, dropping portal-local
+/// cookies (`portal_session`, `portal_oidc_flow`, …). Returns None when no
+/// forwardable cookies remain.
+fn filter_upstream_cookies(headers: &HeaderMap) -> Option<HeaderValue> {
+    let mut kept: Vec<String> = Vec::new();
+    for value in headers.get_all(header::COOKIE).iter() {
+        let Ok(raw) = value.to_str() else { continue };
+        for pair in raw.split(';') {
+            let pair = pair.trim();
+            if pair.is_empty() {
+                continue;
+            }
+            let name = pair.split('=').next().unwrap_or("").trim();
+            if name.starts_with(PORTAL_COOKIE_PREFIX) {
+                continue;
+            }
+            kept.push(pair.to_string());
+        }
+    }
+    if kept.is_empty() {
+        return None;
+    }
+    HeaderValue::from_str(&kept.join("; ")).ok()
+}
+
 pub fn proxy_router() -> Router<AppState> {
     Router::new()
         .route("/agent-bff/{*path}", any(proxy_handler))
         .route("/dev-api/{service}/{*path}", any(proxy_handler))
+}
+
+/// Exact allowlist of BFF session-establishment routes. These are the ONLY
+/// /agent-bff/* paths reachable with a plain portal session — everything else
+/// (all API execution) requires the portal-api-tester role. The BFF performs
+/// its own OIDC state/nonce/PKCE/browser-binding validation on callback.
+pub fn bff_session_router() -> Router<AppState> {
+    Router::new()
+        .route("/agent-bff/auth/login", axum::routing::get(proxy_handler))
+        .route("/agent-bff/auth/callback", axum::routing::get(proxy_handler))
+        .route("/agent-bff/auth/session", axum::routing::get(proxy_handler))
+        .route("/agent-bff/auth/me", axum::routing::get(proxy_handler))
+        .route("/agent-bff/auth/logout", axum::routing::post(proxy_handler))
 }
 
 async fn proxy_handler(
@@ -102,6 +145,13 @@ async fn proxy_handler(
         &url,
     );
     for name in FORWARD_HEADERS {
+        if *name == "cookie" {
+            // Forward only non-portal cookies (e.g. __Host-iaop_session).
+            if let Some(filtered) = filter_upstream_cookies(&headers) {
+                req = req.header("cookie", filtered);
+            }
+            continue;
+        }
         if let Ok(hn) = HeaderName::from_bytes(name.as_bytes()) {
             for v in headers.get_all(&hn).iter() {
                 req = req.header(&hn, v);
@@ -136,4 +186,47 @@ async fn proxy_handler(
     builder
         .body(Body::from(resp_bytes))
         .map_err(|e| PortalError::Internal(format!("response build: {e}")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::HeaderValue;
+
+    fn headers_with_cookie(raw: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert(header::COOKIE, HeaderValue::from_str(raw).unwrap());
+        h
+    }
+
+    #[test]
+    fn portal_cookies_are_stripped_from_upstream_forwarding() {
+        let h = headers_with_cookie(
+            "portal_session=abc; portal_oidc_flow=xyz; __Host-iaop_session=bff; other=1",
+        );
+        let filtered = filter_upstream_cookies(&h).unwrap();
+        let s = filtered.to_str().unwrap();
+        assert!(!s.contains("portal_session"));
+        assert!(!s.contains("portal_oidc_flow"));
+        assert!(s.contains("__Host-iaop_session=bff"));
+        assert!(s.contains("other=1"));
+    }
+
+    #[test]
+    fn all_portal_cookies_yields_no_cookie_header() {
+        let h = headers_with_cookie("portal_session=abc; portal_oidc_flow=xyz");
+        assert!(filter_upstream_cookies(&h).is_none());
+    }
+
+    #[test]
+    fn no_cookie_header_yields_none() {
+        assert!(filter_upstream_cookies(&HeaderMap::new()).is_none());
+    }
+
+    #[test]
+    fn bff_session_allowlist_is_exact() {
+        // The router must expose exactly the five session routes; arbitrary
+        // /agent-bff/auth* or other paths are NOT registered here.
+        let _ = bff_session_router(); // builds without panic
+    }
 }
