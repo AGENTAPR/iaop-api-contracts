@@ -77,8 +77,8 @@ services:
   verificationStatus: unit_verified
   specPath: specs/development/agency-service/openapi.json
   sourceRef: development
-  sourceCommit: 8105a5095837644273ef2f308cab0ca2860a24f4
-  apiVersion: 0.1.0
+  sourceCommit: 08057281a15a77c55ec4bf7bb2473c583f4592a6
+  apiVersion: 0.2.0
   enabled: true
   domainOwner: Agency Hierarchy Team
   serverUrl: https://api-dev.iaop.internal/agency-service
