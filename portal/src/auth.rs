@@ -536,7 +536,7 @@ pub async fn require_session(
             .unwrap_or("/");
         let safe_dest = sanitize_return_to(Some(dest));
         let target = format!("/auth/login?return_to={}", urlencoding(&safe_dest));
-        return Redirect::see_other(&target).into_response();
+        return Redirect::to(&target).into_response();
     }
 
     (
@@ -605,7 +605,7 @@ mod tests {
             "https://evil.example.com/",
             "http://evil.example.com",
             "//evil.example.com/path",
-            "/\evil",
+            r"/\evil",
             "javascript:alert(1)",
             "reference/frontend",
             "",
