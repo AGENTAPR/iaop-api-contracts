@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "IAOP Central Service Catalog Schema v2",
+  "description": "Schema for the IAOP OpenAPI central service registry (services.yaml). v2 adds catalog, channel, boundedContext, lifecycle, implementationStatus, deploymentStatus, and verificationStatus fields.",
+  "type": "object",
+  "required": ["schemaVersion", "services"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "repository",
+          "environment",
+          "visibility",
+          "maturity",
+          "specPath",
+          "sourceRef",
+          "apiVersion",
+          "enabled",
+          "catalog",
+          "lifecycle"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100
+          },
+          "repository": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+          },
+          "environment": {
+            "type": "string",
+            "enum": ["development", "uat", "production"]
+          },
+          "visibility": {
+            "type": "string",
+            "enum": ["public", "internal", "restricted"]
+          },
+          "maturity": {
+            "type": "string",
+            "enum": [
+              "implemented_verified",
+              "implemented_unverified",
+              "proposed_contract",
+              "deprecated",
+              "blocked"
+            ]
+          },
+          "catalog": {
+            "type": "string",
+            "enum": ["frontend", "backend"],
+            "description": "Classifies the service as a frontend BFF or a backend domain service."
+          },
+          "channel": {
+            "type": "string",
+            "enum": ["agent", "office", "customer", "shared", "platform"],
+            "description": "The user-facing channel this service targets. Applicable primarily to frontend catalog entries."
+          },
+          "boundedContext": {
+            "type": "string",
+            "description": "Domain bounded context this service belongs to (e.g. 'Sales & Insurance')."
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": ["active", "proposed", "deprecated", "blocked"],
+            "description": "Current lifecycle state: active (live/deployed), proposed (spec only), deprecated, or blocked."
+          },
+          "implementationStatus": {
+            "type": "string",
+            "enum": ["implemented_verified", "implemented_unverified", "proposed", "not_started"],
+            "description": "Implementation readiness, supersedes maturity for new v2 entries."
+          },
+          "deploymentStatus": {
+            "type": "string",
+            "enum": ["deployed", "not_deployed", "unknown"],
+            "description": "Whether this service is currently deployed in the target environment."
+          },
+          "verificationStatus": {
+            "type": "string",
+            "enum": ["e2e_verified", "unit_verified", "not_verified", "unknown"],
+            "description": "Highest level of test verification achieved for this service."
+          },
+          "specPath": {
+            "type": "string",
+            "pattern": "^specs/[a-z0-9_-]+/[a-z0-9_-]+/(openapi\\.(json|yaml))$"
+          },
+          "sourceRef": {
+            "type": "string"
+          },
+          "sourceCommit": {
+            "type": ["string", "null"]
+          },
+          "apiVersion": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9.]+)?$"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "domainOwner": {
+            "type": "string"
+          },
+          "serverUrl": {
+            "type": ["string", "null"]
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

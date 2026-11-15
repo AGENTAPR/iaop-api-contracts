@@ -4,3 +4,14 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Rust build artifacts
+target/
+portal/target/
+Cargo.lock.bak
+
+# Node & test artifacts
+node_modules/
+portal/tests/browser/node_modules/
+portal/tests/browser/test-results/
+portal/tests/browser/playwright-report/

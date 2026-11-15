@@ -1,0 +1,389 @@
+schemaVersion: 2
+services:
+- id: agent-bff
+  name: AGENA Agent BFF
+  repository: AGENTAPR/iaop-agent-bff
+  environment: development
+  visibility: public
+  maturity: implemented_verified
+  catalog: frontend
+  channel: agent
+  boundedContext: Agent & Distribution
+  lifecycle: active
+  implementationStatus: implemented_verified
+  deploymentStatus: deployed
+  verificationStatus: e2e_verified
+  specPath: specs/development/agent-bff/openapi.json
+  sourceRef: development
+  sourceCommit: c5a2056d369e60cc8bb87e0667f42d769418d2a2
+  apiVersion: 1.0.0
+  enabled: true
+  domainOwner: Agent Platform & Experience Team
+  serverUrl: https://8082-agq5lpbszgbva3ygddcbarv6ea.instabox.tech
+  description: AGENA Insurance Agent Lifecycle Platform BFF — Complete verified implementation covering 52 endpoints across
+    Identity, Today Dashboard, Sales, Documents, and Earnings.
+- id: operations-bff
+  name: IAOP Operations BFF
+  repository: AGENTAPR/iaop-operations-bff
+  environment: development
+  visibility: restricted
+  maturity: proposed_contract
+  catalog: frontend
+  channel: office
+  boundedContext: Back Office
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/operations-bff/openapi.json
+  sourceRef: development
+  sourceCommit: 2d43b141f977dddadccaa02de2db2122367b85da
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Back Office Operations Team
+  serverUrl: https://api-dev.iaop.internal/operations-bff
+  description: Operations portal BFF for underwriting, compliance approvals, manual reviews, and admin.
+- id: agent-service
+  name: IAOP Agent Service
+  repository: AGENTAPR/iaop-agent-service
+  environment: development
+  visibility: internal
+  maturity: implemented_verified
+  catalog: backend
+  boundedContext: Agent & Distribution
+  lifecycle: active
+  implementationStatus: implemented_verified
+  deploymentStatus: deployed
+  verificationStatus: unit_verified
+  specPath: specs/development/agent-service/openapi.json
+  sourceRef: development
+  sourceCommit: 8f9f1685faea35c8590a26f01b02706dfaf9c0b2
+  apiVersion: 1.0.0
+  enabled: true
+  domainOwner: Agent Core Domain Team
+  serverUrl: https://api-dev.iaop.internal/agent-service
+  description: Agent Registry, appointments, identity links, and lifecycle state machine (17 operations verified).
+- id: agency-service
+  name: IAOP Agency Service
+  repository: AGENTAPR/iaop-agency-service
+  environment: development
+  visibility: internal
+  maturity: implemented_verified
+  catalog: backend
+  boundedContext: Agent & Distribution
+  lifecycle: active
+  implementationStatus: implemented_verified
+  deploymentStatus: deployed
+  verificationStatus: e2e_verified
+  specPath: specs/development/agency-service/openapi.json
+  sourceRef: development
+  sourceCommit: a57afbb3c859f4286f76a7c236abf7acb0c59bd8
+  apiVersion: 0.2.0
+  enabled: true
+  domainOwner: Agency Hierarchy Team
+  serverUrl: https://api-dev.iaop.internal/agency-service
+  description: Organizational hierarchy, assignments, agency leadership, and effective-dated relationships. Resource-level
+    organizational scope authorization enforced.
+- id: integration-service
+  name: IAOP Integration Service
+  repository: AGENTAPR/iaop-integration-service
+  environment: development
+  visibility: restricted
+  maturity: implemented_verified
+  catalog: backend
+  boundedContext: Integration & Platform
+  lifecycle: active
+  implementationStatus: implemented_verified
+  deploymentStatus: deployed
+  verificationStatus: unit_verified
+  specPath: specs/development/integration-service/openapi.json
+  sourceRef: development
+  sourceCommit: e95a79011e4bf646db41d6dc79b47e85c13b6320
+  apiVersion: 1.0.0
+  enabled: true
+  domainOwner: Integration Platform Team
+  serverUrl: https://api-dev.iaop.internal/integration-service
+  description: External operations, multi-provider connectors, HMAC-SHA256 callbacks, and state reconciliation (10 operations
+    implemented & verified).
+- id: recruitment-service
+  name: IAOP Recruitment Service
+  repository: AGENTAPR/iaop-recruitment-service
+  environment: development
+  visibility: internal
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Recruitment & Onboarding
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/recruitment-service/openapi.json
+  sourceRef: development
+  sourceCommit: 1d288fcfe03350550a1daa9efcabdcc9abeb4ced
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Recruitment & Talent Team
+  serverUrl: https://api-dev.iaop.internal/recruitment-service
+  description: Candidate pipeline, candidate screening, referrals, and candidate invitation workflows.
+- id: onboarding-service
+  name: IAOP Onboarding Service
+  repository: AGENTAPR/iaop-onboarding-service
+  environment: development
+  visibility: internal
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Recruitment & Onboarding
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/onboarding-service/openapi.json
+  sourceRef: development
+  sourceCommit: 78f0382a197cb247e7fa14595e58f5faf72fc12e
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Agent Onboarding Team
+  serverUrl: https://api-dev.iaop.internal/onboarding-service
+  description: Agent onboarding checklists, e-KYC integration, document submission, and contracting.
+- id: learning-service
+  name: IAOP Learning Service
+  repository: AGENTAPR/iaop-learning-service
+  environment: development
+  visibility: internal
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Learning & Certification
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/learning-service/openapi.json
+  sourceRef: development
+  sourceCommit: 30bc2b9c92150f425adc0079b048578ae51219b1
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Academy & Training Team
+  serverUrl: https://api-dev.iaop.internal/learning-service
+  description: Agent training modules, mandatory CPD credits, course enrollments, and quiz progress.
+- id: certification-service
+  name: IAOP Certification Service
+  repository: AGENTAPR/iaop-certification-service
+  environment: development
+  visibility: internal
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Learning & Certification
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/certification-service/openapi.json
+  sourceRef: development
+  sourceCommit: a649b469a25439037d653cf73be8d131ac5f5fa1
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Compliance & Licensing Team
+  serverUrl: https://api-dev.iaop.internal/certification-service
+  description: AAJI, AASI, and OJK certification tracking, license renewals, and exam proof evidence.
+- id: eligibility-service
+  name: IAOP Eligibility Service
+  repository: AGENTAPR/iaop-eligibility-service
+  environment: development
+  visibility: internal
+  maturity: implemented_unverified
+  catalog: backend
+  boundedContext: Integration & Platform
+  lifecycle: active
+  implementationStatus: implemented_unverified
+  deploymentStatus: deployed
+  verificationStatus: not_verified
+  specPath: specs/development/eligibility-service/openapi.json
+  sourceRef: development
+  sourceCommit: 7e8defd9bf1f8cc531d3ef7819f438e08dbecfc1
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Underwriting & Compliance Team
+  serverUrl: https://api-dev.iaop.internal/eligibility-service
+  description: Real-time selling eligibility checks, product accreditation rules, and license validation. Currently deployed
+    with a minimal contract (system info + health); business endpoints pending.
+- id: sales-service
+  name: IAOP Sales Service
+  repository: AGENTAPR/iaop-sales-service
+  environment: development
+  visibility: internal
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Sales & Insurance
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/sales-service/openapi.json
+  sourceRef: development
+  sourceCommit: f73aaa3019c381e8876db79166f26e613364ab88
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Sales Enablement Team
+  serverUrl: https://api-dev.iaop.internal/sales-service
+  description: Product catalog, premium illustrations, benefit calculation, and proposal lifecycle.
+- id: portfolio-service
+  name: IAOP Portfolio Service
+  repository: AGENTAPR/iaop-portfolio-service
+  environment: development
+  visibility: internal
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Sales & Insurance
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/portfolio-service/openapi.json
+  sourceRef: development
+  sourceCommit: 4cb5dfafb90ee295b3f0c3a3e1b2c3e01408005a
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Policy Admin Team
+  serverUrl: https://api-dev.iaop.internal/portfolio-service
+  description: Customer policy portfolio, policy status, premium billing schedules, and servicing.
+- id: commission-service
+  name: IAOP Commission Service
+  repository: AGENTAPR/iaop-commission-service
+  environment: development
+  visibility: restricted
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Sales & Insurance
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/commission-service/openapi.json
+  sourceRef: development
+  sourceCommit: 73a2a13f69fe485db980b342bc3857187d46c4e1
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Finance & Compensation Team
+  serverUrl: https://api-dev.iaop.internal/commission-service
+  description: Commission calculation, hierarchy splits, clawback management, and payout statements.
+- id: compliance-service
+  name: IAOP Compliance Service
+  repository: AGENTAPR/iaop-compliance-service
+  environment: development
+  visibility: restricted
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Compliance & Performance
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/compliance-service/openapi.json
+  sourceRef: development
+  sourceCommit: 4c65366b816270299b4c4f164130b6a20df0392b
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Legal & Risk Governance Team
+  serverUrl: https://api-dev.iaop.internal/compliance-service
+  description: Compliance breach tracking, regulatory sanctions, market conduct reviews, and selling blocks.
+- id: performance-service
+  name: IAOP Performance Service
+  repository: AGENTAPR/iaop-performance-service
+  environment: development
+  visibility: internal
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Compliance & Performance
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/performance-service/openapi.json
+  sourceRef: development
+  sourceCommit: ef96bd51c03ae1b4d7c6f9eea60b74a23823353f
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Agency Performance Team
+  serverUrl: https://api-dev.iaop.internal/performance-service
+  description: Sales targets, MDRT progress, agency leaderboard, persistency ratios, and campaigns.
+- id: workflow-service
+  name: IAOP Workflow Service
+  repository: AGENTAPR/iaop-workflow-service
+  environment: development
+  visibility: internal
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Workflow & Documents
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/workflow-service/openapi.json
+  sourceRef: development
+  sourceCommit: 0e3d565da19d24db266278e28df0a673f75b1b06
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Business Process Team
+  serverUrl: https://api-dev.iaop.internal/workflow-service
+  description: BPMN execution, human task assignment, approval transitions, and process history.
+- id: notification-service
+  name: IAOP Notification Service
+  repository: AGENTAPR/iaop-notification-service
+  environment: development
+  visibility: internal
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Notifications
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/notification-service/openapi.json
+  sourceRef: development
+  sourceCommit: c9ba5242fa7b9c9f1438dbc04b7c038926fe62de
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Customer Communications Team
+  serverUrl: https://api-dev.iaop.internal/notification-service
+  description: Multi-channel notifications (Push, Email, WhatsApp, SMS), templates, and delivery dispatch.
+- id: document-service
+  name: IAOP Document Service
+  repository: AGENTAPR/iaop-document-service
+  environment: development
+  visibility: internal
+  maturity: proposed_contract
+  catalog: backend
+  boundedContext: Workflow & Documents
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/document-service/openapi.json
+  sourceRef: development
+  sourceCommit: 33941fb416530a33539233d68e38176445f73a42
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Content & Storage Platform Team
+  serverUrl: https://api-dev.iaop.internal/document-service
+  description: Secure document storage, pre-signed upload/download URLs, optical character recognition, and retention.
+- id: customer-bff
+  name: AGENA Customer BFF
+  repository: AGENTAPR/agena-customer-web
+  environment: development
+  visibility: restricted
+  maturity: proposed_contract
+  catalog: frontend
+  channel: customer
+  boundedContext: Customer Self-Service
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/customer-bff/openapi.json
+  sourceRef: development
+  sourceCommit: null
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Customer Experience Team
+  serverUrl: https://api-dev.iaop.internal/customer-bff
+  description: Planned customer-facing BFF for self-service journeys. Contract placeholder only — no implementation deployed.

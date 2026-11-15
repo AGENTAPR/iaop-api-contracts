@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.iaop.internal/schemas/common/problem-details.schema.json",
+  "title": "RFC 9457 Problem Details",
+  "type": "object",
+  "required": ["type", "title", "status", "code"],
+  "properties": {
+    "type": {"type": "string", "format": "uri"},
+    "title": {"type": "string"},
+    "status": {"type": "integer", "minimum": 400, "maximum": 599},
+    "detail": {"type": "string"},
+    "instance": {"type": "string"},
+    "code": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"},
+    "correlationId": {"type": "string", "format": "uuid"}
+  },
+  "additionalProperties": true
+}
