@@ -22,19 +22,37 @@ const consoleErrors = [];
   const results = [];
   const check = (name, ok, extra='') => { results.push({name, ok, extra}); console.log((ok?'PASS':'FAIL')+' '+name+(extra?' — '+extra:'')); };
 
-  // 1. Anonymous access
-  const anon = await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
-  check('anonymous / denied (401)', anon.status() === 401, 'status=' + anon.status());
-  await page.screenshot({ path: OUT + '/01-anon.png' });
+  // 1. Anonymous page navigation auto-redirects into Keycloak login
+  const anonResp = await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  // Browser follows 303 → /auth/login → 303 → Keycloak; final page is the
+  // Keycloak login form (HTTP 200) — proves the redirect chain works.
+  const onKeycloak = /\/realms\/iaop-dev\//.test(page.url()) ||
+    (await page.locator('input[name="username"]').count()) > 0;
+  check('anonymous / redirects to Keycloak login', onKeycloak, page.url());
+  await page.screenshot({ path: OUT + '/01-anon-keycloak.png' });
 
-  // 2. Portal login flow
-  await page.goto(BASE + '/auth/login', { waitUntil: 'domcontentloaded' });
+  // Anonymous API/spec requests still get JSON 401 (no redirect).
+  const apiResp = await page.request.get(BASE + '/api/v1/catalog');
+  check('anonymous catalog API → 401 JSON', apiResp.status() === 401, 'status=' + apiResp.status());
+  const specResp = await page.request.get(BASE + '/specs/development/agent-bff/openapi.json');
+  check('anonymous spec → 401 JSON', specResp.status() === 401, 'status=' + specResp.status());
+
+  // Deep-link: anonymous Scalar page navigation redirects with return_to.
+  const deep = await page.request.get(BASE + '/reference/frontend/agent-bff', {
+    headers: { 'Accept': 'text/html' }, maxRedirects: 0,
+  });
+  const deepLoc = deep.headers()['location'] || '';
+  check('deep link anon → 303 login + return_to',
+    deep.status() === 303 && deepLoc.includes('/auth/login?return_to=') && deepLoc.includes('agent-bff'),
+    deep.status() + ' ' + deepLoc.slice(0, 120));
+
+  // 2. Complete the Keycloak login already reached via the redirect
   await page.waitForSelector('input[name="username"]', { timeout: 20000 });
   await page.fill('input[name="username"]', USER);
   await page.fill('input[name="password"]', PASS);
   await page.click('#kc-login, input[type="submit"], button[type="submit"]');
   await page.waitForURL(u => u.pathname === '/' || u.pathname.startsWith('/reference'), { timeout: 30000 });
-  check('portal SSO login', page.url().startsWith(BASE), page.url());
+  check('portal SSO login returns to portal', page.url().startsWith(BASE), page.url());
 
   // 3. Landing page render — light theme
   await page.waitForSelector('#frontend-groups .card, #frontend-groups .state-box', { timeout: 15000 });

@@ -485,7 +485,33 @@ pub fn session_from_headers(state: &AppState, headers: &HeaderMap) -> Option<Por
     state.auth_store.get_session(sid)
 }
 
-/// Axum middleware: require a valid portal session; 401 JSON otherwise.
+/// Returns true when the client asked for an HTML document — i.e. a browser
+/// page navigation rather than a fetch/XHR/API call.
+fn accepts_html(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::ACCEPT)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.contains("text/html"))
+        .unwrap_or(false)
+}
+
+/// Paths that render HTML pages and therefore participate in the
+/// unauthenticated → Keycloak redirect flow. Everything else under the
+/// protected layer (/api/v1/*, /specs/*, /static/*) always gets JSON 401.
+fn is_html_page_path(path: &str) -> bool {
+    path == "/"
+        || path.starts_with("/reference/")
+        || path == "/reference"
+        || path.starts_with("/swagger-ui")
+}
+
+/// Axum middleware: require a valid portal session.
+///
+/// Unauthenticated **browser page navigations** (GET/HEAD + Accept: text/html
+/// on an HTML page path) are redirected into the existing OIDC login flow
+/// with the originally requested relative destination preserved in the
+/// validated `return_to` parameter. API, spec, static-asset and proxy
+/// requests keep receiving JSON 401 — they are never redirected.
 pub async fn require_session(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -493,16 +519,33 @@ pub async fn require_session(
     next: axum::middleware::Next,
 ) -> Response {
     if session_from_headers(&state, &headers).is_some() {
-        next.run(request).await
-    } else {
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(serde_json::json!({
-                "error": {"code":"UNAUTHENTICATED","message":"Portal login required"}
-            })),
-        )
-            .into_response()
+        return next.run(request).await;
     }
+
+    let is_navigation = matches!(
+        request.method(),
+        &axum::http::Method::GET | &axum::http::Method::HEAD
+    ) && accepts_html(&headers)
+        && is_html_page_path(request.uri().path());
+
+    if is_navigation {
+        let dest = request
+            .uri()
+            .path_and_query()
+            .map(|pq| pq.as_str())
+            .unwrap_or("/");
+        let safe_dest = sanitize_return_to(Some(dest));
+        let target = format!("/auth/login?return_to={}", urlencoding(&safe_dest));
+        return Redirect::see_other(&target).into_response();
+    }
+
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(serde_json::json!({
+            "error": {"code":"UNAUTHENTICATED","message":"Portal login required"}
+        })),
+    )
+        .into_response()
 }
 
 /// Axum middleware: require a valid portal session AND the configured
@@ -537,4 +580,76 @@ pub async fn require_api_tester(
 
 pub fn make_store() -> SharedStore {
     Arc::new(SessionStore::default())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn return_to_accepts_relative_paths() {
+        assert_eq!(sanitize_return_to(Some("/")), "/");
+        assert_eq!(
+            sanitize_return_to(Some("/reference/frontend/agent-bff")),
+            "/reference/frontend/agent-bff"
+        );
+        assert_eq!(
+            sanitize_return_to(Some("/reference/backend/agency-service?tab=ops")),
+            "/reference/backend/agency-service?tab=ops"
+        );
+    }
+
+    #[test]
+    fn return_to_rejects_open_redirects() {
+        for bad in [
+            "https://evil.example.com/",
+            "http://evil.example.com",
+            "//evil.example.com/path",
+            "/\evil",
+            "javascript:alert(1)",
+            "reference/frontend",
+            "",
+        ] {
+            assert_eq!(
+                sanitize_return_to(Some(bad)),
+                "/",
+                "should sanitize {bad:?}"
+            );
+        }
+        assert_eq!(sanitize_return_to(None), "/");
+    }
+
+    #[test]
+    fn html_page_paths_cover_only_page_routes() {
+        assert!(is_html_page_path("/"));
+        assert!(is_html_page_path("/reference/frontend/agent-bff"));
+        assert!(is_html_page_path("/reference/backend"));
+        assert!(is_html_page_path("/swagger-ui"));
+        for api in [
+            "/api/v1/catalog",
+            "/specs/development/agent-bff/openapi.json",
+            "/static/scripts/portal.js",
+            "/dev-api/agent/api/v1/agents",
+            "/agent-bff/api/v1/me",
+            "/auth/login",
+            "/health/live",
+        ] {
+            assert!(!is_html_page_path(api), "{api} must stay JSON 401");
+        }
+    }
+
+    #[test]
+    fn accept_header_detection() {
+        let mut h = HeaderMap::new();
+        assert!(!accepts_html(&h));
+        h.insert(header::ACCEPT, "application/json".parse().unwrap());
+        assert!(!accepts_html(&h));
+        h.insert(
+            header::ACCEPT,
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                .parse()
+                .unwrap(),
+        );
+        assert!(accepts_html(&h));
+    }
 }

@@ -70,6 +70,26 @@ fn req_with_session(uri: &str, sid: &str) -> Request<Body> {
         .unwrap()
 }
 
+/// Browser page-navigation request: GET + Accept: text/html.
+fn req_html(uri: &str) -> Request<Body> {
+    Request::builder()
+        .uri(uri)
+        .header(
+            header::ACCEPT,
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        )
+        .body(Body::empty())
+        .unwrap()
+}
+
+fn location_of(res: &axum::response::Response) -> String {
+    res.headers()
+        .get(header::LOCATION)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string()
+}
+
 #[tokio::test]
 async fn anonymous_denied_everywhere_except_health_and_auth() {
     let app = build_router(setup_state());
@@ -188,4 +208,180 @@ async fn bogus_session_cookie_denied() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+// ---------------------------------------------------------------------------
+// HTML navigation → OIDC login redirect
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn anonymous_html_navigation_redirects_to_login_with_return_to() {
+    let app = build_router(setup_state());
+    for (uri, expected_dest) in [
+        ("/", "%2F"),
+        ("/reference/frontend/agent-bff", "%2Freference%2Ffrontend%2Fagent-bff"),
+        (
+            "/reference/backend/agency-service",
+            "%2Freference%2Fbackend%2Fagency-service",
+        ),
+    ] {
+        let res = app.clone().oneshot(req_html(uri)).await.unwrap();
+        assert_eq!(res.status(), StatusCode::SEE_OTHER, "nav {uri}");
+        let loc = location_of(&res);
+        assert!(
+            loc.starts_with("/auth/login?return_to="),
+            "{uri} location: {loc}"
+        );
+        assert!(
+            loc.contains(expected_dest),
+            "{uri} must preserve destination, got {loc}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn return_to_preserves_path_and_query() {
+    let app = build_router(setup_state());
+    let res = app
+        .oneshot(req_html("/reference/backend/agency-service?tab=operations&env=dev"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::SEE_OTHER);
+    let loc = location_of(&res);
+    // return_to value is percent-encoded; decode and verify round-trip.
+    let encoded = loc.rsplit('=').next().unwrap();
+    let decoded = urlencoding_decode(encoded);
+    assert_eq!(
+        decoded,
+        "/reference/backend/agency-service?tab=operations&env=dev"
+    );
+}
+
+fn urlencoding_decode(s: &str) -> String {
+    let bytes = s.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap();
+            if let Ok(v) = u8::from_str_radix(hex, 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    String::from_utf8(out).unwrap()
+}
+
+#[tokio::test]
+async fn anonymous_api_spec_static_and_proxy_stay_json_401() {
+    let app = build_router(setup_state());
+    // Even with an HTML Accept header, non-page paths must NOT redirect —
+    // API clients and asset fetches keep receiving JSON 401.
+    for uri in [
+        "/api/v1/catalog",
+        "/api/v1/services/agent-service",
+        "/specs/development/agent-bff/openapi.json",
+        "/static/scripts/portal.js",
+        "/static/scalar.min.js",
+        "/dev-api/agent/api/v1/agents",
+        "/agent-bff/api/v1/me",
+    ] {
+        let res = app.clone().oneshot(req_html(uri)).await.unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED, "{uri}");
+        assert!(
+            location_of(&res).is_empty(),
+            "{uri} must not redirect"
+        );
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let text = String::from_utf8_lossy(&body);
+        assert!(text.contains("UNAUTHENTICATED"), "{uri} body: {text}");
+    }
+}
+
+#[tokio::test]
+async fn authenticated_session_gets_page_without_redirect() {
+    let state = setup_state();
+    session(&state, "viewer-html", vec![]);
+    let app = build_router(state);
+    let res = app
+        .clone()
+        .oneshot({
+            let mut r = req_html("/");
+            r.headers_mut().insert(
+                header::COOKIE,
+                "portal_session=viewer-html".parse().unwrap(),
+            );
+            r
+        })
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(location_of(&res).is_empty());
+}
+
+#[tokio::test]
+async fn bogus_or_expired_session_cookie_redirects_html_navigation() {
+    let app = build_router(setup_state());
+    // Unknown session id behaves exactly like no session for HTML nav.
+    let mut r = req_html("/reference/frontend/agent-bff");
+    r.headers_mut().insert(
+        header::COOKIE,
+        "portal_session=does-not-exist".parse().unwrap(),
+    );
+    let res = app.oneshot(r).await.unwrap();
+    assert_eq!(res.status(), StatusCode::SEE_OTHER);
+    assert!(location_of(&res).contains("/auth/login?return_to="));
+}
+
+#[tokio::test]
+async fn auth_endpoints_never_redirect_into_middleware() {
+    let app = build_router(setup_state());
+    // /auth/login is public and must redirect to Keycloak, never loop back
+    // through require_session.
+    let res = app
+        .clone()
+        .oneshot(req_html("/auth/login"))
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::SEE_OTHER);
+    let loc = location_of(&res);
+    assert!(
+        loc.contains("idp.test/realms/test/protocol/openid-connect/auth"),
+        "login must go to issuer, got {loc}"
+    );
+    // Health probes remain public 200.
+    for uri in ["/health/live", "/health/ready"] {
+        let res = app.clone().oneshot(req(uri)).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK, "{uri}");
+    }
+}
+
+#[tokio::test]
+async fn non_html_methods_do_not_redirect() {
+    let app = build_router(setup_state());
+    // POST to a page path is not a navigation → JSON 401.
+    let res = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/")
+                .header(header::ACCEPT, "text/html")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    // POST / has no route under the protected layer → 405 from router, but
+    // crucially it must NOT be a login redirect. Accept either 405 or 401.
+    assert!(
+        res.status() == StatusCode::METHOD_NOT_ALLOWED
+            || res.status() == StatusCode::UNAUTHORIZED,
+        "unexpected {}",
+        res.status()
+    );
+    assert!(location_of(&res).is_empty());
 }
