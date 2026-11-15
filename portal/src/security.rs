@@ -13,7 +13,7 @@ pub fn sanitize_path(base_dir: &Path, requested_rel_path: &Path) -> Result<PathB
         return Err(PortalError::Security("Absolute paths are forbidden".into()));
     }
 
-    // Inspect components: reject ParentDir (..) and Null bytes
+    // Inspect components: reject ParentDir (..) and null bytes
     for comp in requested_rel_path.components() {
         match comp {
             Component::ParentDir => {
@@ -36,7 +36,7 @@ pub fn sanitize_path(base_dir: &Path, requested_rel_path: &Path) -> Result<PathB
 
     let resolved = base_dir.join(requested_rel_path);
 
-    // Canonicalize base_dir if it exists
+    // Canonicalize base_dir
     let canonical_base = base_dir
         .canonicalize()
         .map_err(|e| PortalError::Internal(format!("Base directory inaccessible: {}", e)))?;
@@ -56,6 +56,9 @@ pub fn sanitize_path(base_dir: &Path, requested_rel_path: &Path) -> Result<PathB
 }
 
 /// Applies standard enterprise security headers to all responses.
+///
+/// The CSP is compatible with Scalar API Reference served from `/static/scalar.min.js`
+/// (same origin). No CDN URLs are needed at runtime.
 pub async fn security_headers_middleware(
     request: Request<axum::body::Body>,
     next: Next,
@@ -76,10 +79,18 @@ pub async fn security_headers_middleware(
         header::HeaderName::from_static("x-xss-protection"),
         HeaderValue::from_static("1; mode=block"),
     );
+    // Scalar JS is served from /static/ (same origin) — no external script-src needed.
     headers.insert(
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static(
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';",
+            "default-src 'self'; \
+             script-src 'self'; \
+             style-src 'self' 'unsafe-inline'; \
+             font-src 'self' https://fonts.scalar.com; \
+             img-src 'self' data:; \
+             connect-src 'self'; \
+             worker-src 'none'; \
+             frame-ancestors 'none';",
         ),
     );
 

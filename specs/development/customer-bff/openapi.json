@@ -1,0 +1,11 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AGENA Customer BFF",
+    "version": "0.1.0",
+    "description": "PLANNED contract placeholder. The customer-facing BFF is not yet implemented or deployed. This document intentionally contains no paths."
+  },
+  "servers": [{ "url": "/agent-bff/api/v1", "description": "Reserved — will be rewritten to the portal proxy when implemented" }],
+  "paths": {},
+  "components": { "schemas": {} }
+}
