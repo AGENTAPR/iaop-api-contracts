@@ -9,9 +9,7 @@ use http_body_util::BodyExt;
 use std::{path::PathBuf, sync::Arc};
 use tower::ServiceExt;
 
-use iaop_developer_portal::{
-    auth, build_router, load_and_validate_catalog, AppConfig, AppState,
-};
+use iaop_developer_portal::{auth, build_router, load_and_validate_catalog, AppConfig, AppState};
 
 fn setup_state() -> AppState {
     let md = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -124,10 +122,7 @@ async fn authenticated_session_accesses_catalog_but_not_proxy_without_role() {
     let doc: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let scheme = &doc["components"]["securitySchemes"]["keycloakOAuth"];
     assert_eq!(scheme["type"], "oauth2");
-    assert_eq!(
-        scheme["flows"]["authorizationCode"]["x-usePkce"],
-        "SHA-256"
-    );
+    assert_eq!(scheme["flows"]["authorizationCode"]["x-usePkce"], "SHA-256");
     assert_eq!(
         scheme["flows"]["authorizationCode"]["x-scalar-client-id"],
         "iaop-scalar-dev"
@@ -162,7 +157,10 @@ async fn tester_role_reaches_proxy_and_unknown_upstream_denied() {
     // agency upstream is NOT configured -> 404 even for authorized tester.
     let res = app
         .clone()
-        .oneshot(req_with_session("/dev-api/agency/api/v1/system/info", "tester"))
+        .oneshot(req_with_session(
+            "/dev-api/agency/api/v1/system/info",
+            "tester",
+        ))
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::NOT_FOUND);

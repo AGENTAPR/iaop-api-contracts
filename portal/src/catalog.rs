@@ -61,6 +61,10 @@ pub struct ServiceEntry {
     /// "e2e_verified" | "unit_verified" | "not_verified" | "unknown"
     #[serde(default)]
     pub verification_status: Option<String>,
+    /// Number of operations in the published OpenAPI spec, computed at
+    /// request time. Not part of the YAML catalog.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operation_count: Option<u32>,
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +120,12 @@ pub struct ServiceMeta {
     pub description: Option<String>,
     pub server_url: Option<String>,
     pub maturity: String,
+    #[serde(default)]
+    pub implementation_status: Option<String>,
+    #[serde(default)]
+    pub deployment_status: Option<String>,
+    #[serde(default)]
+    pub verification_status: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -349,6 +359,9 @@ pub fn build_scalar_config(
             description: entry.description.clone(),
             server_url: entry.server_url.clone(),
             maturity: entry.maturity.clone(),
+            implementation_status: entry.implementation_status.clone(),
+            deployment_status: entry.deployment_status.clone(),
+            verification_status: entry.verification_status.clone(),
         },
     })
 }

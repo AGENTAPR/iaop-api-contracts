@@ -29,7 +29,7 @@ fn setup_test_state() -> AppState {
         allowed_cors_origins: vec![],
         // For tests, Scalar JS won't exist on disk — the route will return 500 if hit,
         // but health/catalog/specs tests don't exercise it.
-                scalar_js_path: PathBuf::from("portal/tests/fixtures/scalar.min.js"),
+        scalar_js_path: PathBuf::from("portal/tests/fixtures/scalar.min.js"),
         oidc_issuer: None,
         oidc_client_id: None,
         oidc_client_secret: None,
@@ -451,14 +451,16 @@ async fn nonexistent_spec_returns_404() {
 const TEST_SESSION_ID: &str = "test-portal-session";
 
 fn seed_session(state: &AppState) {
-    state.auth_store.put_session(iaop_developer_portal::auth::PortalSession {
-        session_id: TEST_SESSION_ID.into(),
-        subject: "test-subject".into(),
-        display_name: "Test User".into(),
-        email: None,
-        roles: vec!["portal-api-tester".into()],
-        created_at: std::time::Instant::now(),
-    });
+    state
+        .auth_store
+        .put_session(iaop_developer_portal::auth::PortalSession {
+            session_id: TEST_SESSION_ID.into(),
+            subject: "test-subject".into(),
+            display_name: "Test User".into(),
+            email: None,
+            roles: vec!["portal-api-tester".into()],
+            created_at: std::time::Instant::now(),
+        });
 }
 
 async fn inject_test_session(

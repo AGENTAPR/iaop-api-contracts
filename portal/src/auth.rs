@@ -72,7 +72,10 @@ impl SessionStore {
 
     pub fn put_session(&self, s: PortalSession) {
         self.gc();
-        self.sessions.lock().unwrap().insert(s.session_id.clone(), s);
+        self.sessions
+            .lock()
+            .unwrap()
+            .insert(s.session_id.clone(), s);
     }
 
     pub fn get_session(&self, id: &str) -> Option<PortalSession> {
@@ -159,7 +162,11 @@ pub async fn login(
     axum::extract::Query(q): axum::extract::Query<LoginQuery>,
 ) -> Result<Response, PortalError> {
     let cfg = &state.config;
-    let (issuer, client_id, redirect) = match (&cfg.oidc_issuer, &cfg.oidc_client_id, &cfg.oidc_redirect_uri) {
+    let (issuer, client_id, redirect) = match (
+        &cfg.oidc_issuer,
+        &cfg.oidc_client_id,
+        &cfg.oidc_redirect_uri,
+    ) {
         (Some(i), Some(c), Some(r)) => (i, c, r),
         _ => return Err(PortalError::Internal("OIDC not configured".into())),
     };
@@ -189,7 +196,9 @@ pub async fn login(
     let secure = secure_cookies(&state);
     resp.headers_mut().append(
         header::SET_COOKIE,
-        set_cookie(FLOW_COOKIE, &flow_state, 600, secure).parse().unwrap(),
+        set_cookie(FLOW_COOKIE, &flow_state, 600, secure)
+            .parse()
+            .unwrap(),
     );
     Ok(resp)
 }
@@ -293,8 +302,11 @@ pub async fn callback(
         .oidc_jwks_url
         .clone()
         .unwrap_or_else(|| format!("{issuer}/protocol/openid-connect/certs"));
-    let validator: JwtValidator<RemoteJwksProvider> =
-        JwtValidator::new(RemoteJwksProvider::new(jwks_url), issuer.clone(), client_id.clone());
+    let validator: JwtValidator<RemoteJwksProvider> = JwtValidator::new(
+        RemoteJwksProvider::new(jwks_url),
+        issuer.clone(),
+        client_id.clone(),
+    );
     let claims: PortalClaims = validator
         .validate(id_token)
         .await
@@ -340,7 +352,9 @@ pub async fn callback(
             }
             Ok(_) => {
                 // UserInfo returned non-success: treat as no roles (fail closed).
-                tracing::warn!("UserInfo endpoint returned non-success; portal roles will be empty");
+                tracing::warn!(
+                    "UserInfo endpoint returned non-success; portal roles will be empty"
+                );
             }
             Err(e) => {
                 tracing::warn!("UserInfo endpoint unreachable: {e}; portal roles will be empty");
@@ -367,7 +381,9 @@ pub async fn callback(
     let h = resp.headers_mut();
     h.append(
         header::SET_COOKIE,
-        set_cookie(SESSION_COOKIE, &session_id, 28800, secure).parse().unwrap(),
+        set_cookie(SESSION_COOKIE, &session_id, 28800, secure)
+            .parse()
+            .unwrap(),
     );
     h.append(
         header::SET_COOKIE,
@@ -384,10 +400,7 @@ fn jsonwebtoken_decode_payload(token: &str) -> Option<serde_json::Value> {
 }
 
 /// GET /auth/session — lightweight session probe for UI.
-pub async fn session_info(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn session_info(State(state): State<AppState>, headers: HeaderMap) -> Response {
     match session_from_headers(&state, &headers) {
         Some(s) => Json(serde_json::json!({
             "authenticated": true,
@@ -405,10 +418,7 @@ pub async fn session_info(
 }
 
 /// GET /auth/me — authenticated identity.
-pub async fn me(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn me(State(state): State<AppState>, headers: HeaderMap) -> Response {
     match session_from_headers(&state, &headers) {
         Some(s) => Json(serde_json::json!({
             "subject": s.subject,
@@ -447,8 +457,7 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Respon
     // A missing Origin on a same-site form POST is acceptable only when
     // Referer is also absent (strict browser) — allow it only if no cross-
     // origin evidence is present.
-    let origin_ok = request_origin.is_empty()
-        || request_origin.starts_with(allowed_origin);
+    let origin_ok = request_origin.is_empty() || request_origin.starts_with(allowed_origin);
     if !origin_ok {
         return (
             StatusCode::FORBIDDEN,

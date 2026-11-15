@@ -71,6 +71,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/specs/{*spec_path}", get(serve_spec_file))
         // Bundled Scalar JS (served from filesystem, immutable cache)
         .route("/static/scalar.min.js", get(serve_scalar_js))
+        // Portal UI assets (embedded at compile time — same-origin, CSP-safe)
+        .route("/static/portal.css", get(serve_portal_css))
+        .route("/static/portal.js", get(serve_portal_js))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_session,
@@ -125,6 +128,33 @@ fn build_cors(origins: &[String]) -> CorsLayer {
 // ---------------------------------------------------------------------------
 // Static assets
 // ---------------------------------------------------------------------------
+
+async fn serve_portal_css() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        [(
+            header::CACHE_CONTROL,
+            "public, max-age=300, must-revalidate",
+        )],
+        PORTAL_CSS,
+    )
+        .into_response()
+}
+
+async fn serve_portal_js() -> impl IntoResponse {
+    (
+        [(
+            header::CONTENT_TYPE,
+            "application/javascript; charset=utf-8",
+        )],
+        [(
+            header::CACHE_CONTROL,
+            "public, max-age=300, must-revalidate",
+        )],
+        PORTAL_JS,
+    )
+        .into_response()
+}
 
 async fn serve_scalar_js(State(state): State<AppState>) -> Result<Response, PortalError> {
     let content = fs::read(&state.config.scalar_js_path).map_err(|e| {
@@ -268,15 +298,51 @@ fn render_scalar_page(
         )));
     }
 
-    let html = scalar_html(&cfg.service_meta.name, &cfg.spec.url);
+    let html = scalar_html(&cfg.service_meta, &cfg.spec.url);
     Ok(Html(html))
 }
 
-/// Builds the Scalar API Reference HTML page for a given service.
-fn scalar_html(service_name: &str, spec_url: &str) -> String {
-    // Escape to prevent XSS via catalog data
-    let safe_name = html_escape(service_name);
+/// Builds the Scalar API Reference page wrapped in the portal shell.
+/// The shell provides catalog navigation, service identity, environment and
+/// auth-model context; Scalar itself renders the spec unchanged.
+fn scalar_html(meta: &crate::catalog::ServiceMeta, spec_url: &str) -> String {
+    let safe_name = html_escape(&meta.name);
     let safe_url = html_escape(spec_url);
+    let catalog_kind = meta.catalog.as_str();
+    let section = if catalog_kind == "frontend" {
+        "Frontend"
+    } else {
+        "Backend"
+    };
+    let ref_base = if catalog_kind == "frontend" {
+        "/reference/frontend"
+    } else {
+        "/reference/backend"
+    };
+    let auth_note = if catalog_kind == "frontend" {
+        "Testing via BFF session cookie + CSRF — connect through the BFF login flow."
+    } else {
+        "Testing via OAuth2 Authorization Code + PKCE (client iaop-scalar-dev)."
+    };
+    let safe_section = html_escape(section);
+    let safe_auth_note = html_escape(auth_note);
+    let safe_repo = html_escape(&meta.repository);
+    let status_bits: Vec<String> = [
+        meta.implementation_status.as_deref(),
+        meta.deployment_status.as_deref(),
+        meta.verification_status.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .map(|s| format!("<span class=\"tag tag-proposed\">{}</span>", html_escape(s)))
+    .collect();
+    let status_html = status_bits.join(" ");
+    let api_version = html_escape(&format!("v{}", meta.api_version));
+    let description = meta
+        .description
+        .as_deref()
+        .map(|d| format!("<div class=\"ref-desc\">{}</div>", html_escape(d)))
+        .unwrap_or_default();
 
     format!(
         r#"<!DOCTYPE html>
@@ -286,17 +352,36 @@ fn scalar_html(service_name: &str, spec_url: &str) -> String {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <title>{name} — IAOP Developer Portal</title>
-  <style>
-    body {{ margin: 0; }}
-  </style>
+  <link rel="stylesheet" href="/static/portal.css" />
 </head>
 <body>
-  <script id="api-reference" data-url="{url}"></script>
-  <script src="/static/scalar.min.js"></script>
+<div class="ref-shell">
+  <div class="ref-bar">
+    <a href="/">← Catalog</a>
+    <span class="sep">/</span>
+    <a href="{ref_base}">{section}</a>
+    <span class="sep">/</span>
+    <span class="svc-name">{name}</span>
+    <span class="tag tag-version">{api_version}</span>
+    {status_html}
+    <span class="auth-note">{auth_note}</span>
+  </div>
+  {description}
+  <div class="ref-body">
+    <script id="api-reference" data-url="{url}"></script>
+    <script src="/static/scalar.min.js"></script>
+  </div>
+</div>
 </body>
 </html>"#,
         name = safe_name,
         url = safe_url,
+        ref_base = ref_base,
+        section = safe_section,
+        api_version = api_version,
+        status_html = status_html,
+        auth_note = safe_auth_note,
+        description = description,
     )
 }
 
@@ -314,8 +399,62 @@ fn html_escape(s: &str) -> String {
 // ---------------------------------------------------------------------------
 
 async fn get_dual_catalog(State(state): State<AppState>) -> impl IntoResponse {
-    let dual = build_dual_catalog(&state.catalog, &state.config.environment);
+    let mut dual = build_dual_catalog(&state.catalog, &state.config.environment);
+    enrich_operation_counts(&state, &mut dual);
     Json(dual)
+}
+
+/// Counts OpenAPI operations per service by reading its published spec.
+/// Only JSON specs are counted; missing/unparseable specs yield `None`.
+fn enrich_operation_counts(state: &AppState, dual: &mut crate::catalog::DualCatalogResponse) {
+    let mut counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for group in dual.frontend.iter_mut().chain(dual.backend.iter_mut()) {
+        for svc in group.services.iter_mut() {
+            let count = counts
+                .entry(svc.id.clone())
+                .or_insert_with(|| count_spec_operations(&state.config.specs_dir, &svc.spec_path));
+            svc.operation_count = Some(*count);
+        }
+    }
+}
+
+fn count_spec_operations(specs_dir: &std::path::Path, spec_path: &str) -> u32 {
+    // spec_path looks like "specs/development/<svc>/openapi.json"
+    let rel = spec_path.strip_prefix("specs/").unwrap_or(spec_path);
+    let file = specs_dir.join(rel);
+    let Ok(raw) = fs::read(&file) else { return 0 };
+    let Ok(doc) = serde_json::from_slice::<serde_json::Value>(&raw) else {
+        return 0;
+    };
+    doc["paths"]
+        .as_object()
+        .map(|paths| {
+            paths
+                .values()
+                .map(|ops| {
+                    ops.as_object()
+                        .map(|m| {
+                            m.keys()
+                                .filter(|k| {
+                                    matches!(
+                                        k.to_ascii_lowercase().as_str(),
+                                        "get"
+                                            | "post"
+                                            | "put"
+                                            | "patch"
+                                            | "delete"
+                                            | "head"
+                                            | "options"
+                                            | "trace"
+                                    )
+                                })
+                                .count() as u32
+                        })
+                        .unwrap_or(0)
+                })
+                .sum()
+        })
+        .unwrap_or(0)
 }
 
 async fn get_frontend_catalog(State(state): State<AppState>) -> impl IntoResponse {
@@ -403,7 +542,11 @@ fn audience_scope_for(service_id: &str) -> Option<&'static str> {
 /// Returns the portal-relative proxy base for a service, but only when the
 /// corresponding upstream is configured (empty upstream = testing disabled).
 fn proxy_base_for<'a>(state: &'a AppState, service_id: &str) -> Option<String> {
-    let portal = state.config.public_base_url.as_deref()?.trim_end_matches('/');
+    let portal = state
+        .config
+        .public_base_url
+        .as_deref()?
+        .trim_end_matches('/');
     match service_id {
         "agent-bff" if state.config.upstream_agent_bff.is_some() => {
             Some(format!("{portal}/agent-bff/api/v1"))
@@ -472,7 +615,10 @@ fn transform_spec_for_testing(state: &AppState, spec_path: &str, raw: &[u8]) -> 
             }
             let mut selected = vec!["openid".to_string()];
             if let Some(aud) = audience_scope_for(&entry.id) {
-                scopes.insert(aud.into(), serde_json::Value::String(format!("Audience: {aud}")));
+                scopes.insert(
+                    aud.into(),
+                    serde_json::Value::String(format!("Audience: {aud}")),
+                );
                 selected.push(aud.to_string());
             }
             let redirect = format!("{portal}/reference/backend/{}", entry.id);
@@ -501,7 +647,16 @@ fn transform_spec_for_testing(state: &AppState, spec_path: &str, raw: &[u8]) -> 
 }
 
 // ---------------------------------------------------------------------------
-// Landing page HTML (embedded string literal — no external file dependency)
+// Portal UI assets (embedded at compile time — served same-origin so the
+// strict CSP `script-src 'self'` is preserved with no 'unsafe-inline').
+// ---------------------------------------------------------------------------
+
+static PORTAL_CSS: &str = include_str!("../static/portal.css");
+static PORTAL_JS: &str = include_str!("../static/portal.js");
+
+// ---------------------------------------------------------------------------
+// Landing page HTML shell — all catalog rendering happens in portal.js,
+// which builds DOM nodes only (no innerHTML) from /api/v1/catalog.
 // ---------------------------------------------------------------------------
 
 static LANDING_PAGE_HTML: &str = r#"<!DOCTYPE html>
@@ -509,85 +664,33 @@ static LANDING_PAGE_HTML: &str = r#"<!DOCTYPE html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
   <title>IAOP Developer Portal</title>
-  <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; }
-    .header { padding: 32px 48px; border-bottom: 1px solid #1e2433; display: flex; align-items: center; gap: 16px; }
-    .header h1 { margin: 0; font-size: 20px; font-weight: 600; color: #f8fafc; }
-    .header .badge { font-size: 11px; padding: 2px 8px; background: #1e3a5f; color: #60a5fa; border-radius: 4px; font-weight: 500; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 48px; }
-    .section-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 20px; margin-top: 40px; }
-    .section-title:first-child { margin-top: 0; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-    .card { background: #161b27; border: 1px solid #1e2433; border-radius: 8px; padding: 20px; text-decoration: none; color: inherit; display: block; transition: border-color 0.15s, background 0.15s; }
-    .card:hover { border-color: #3b82f6; background: #1a2035; }
-    .card-name { font-size: 15px; font-weight: 600; color: #f1f5f9; margin-bottom: 6px; }
-    .card-desc { font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 12px; }
-    .card-meta { display: flex; gap: 8px; flex-wrap: wrap; }
-    .tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
-    .tag-active { background: #14532d; color: #4ade80; }
-    .tag-proposed { background: #1c1917; color: #a8a29e; border: 1px solid #292524; }
-    .tag-frontend { background: #1e1b4b; color: #818cf8; }
-    .tag-backend { background: #0c1a2e; color: #38bdf8; }
-    .group-label { font-size: 13px; font-weight: 500; color: #64748b; margin-top: 32px; margin-bottom: 12px; padding-left: 10px; border-left: 2px solid #1e2433; }
-  </style>
+  <link rel="stylesheet" href="/static/portal.css" />
 </head>
 <body>
-  <div class="header">
-    <h1>IAOP Developer Portal</h1>
-    <span class="badge">DEV</span>
+  <div class="portal-header">
+    <a class="brand" href="/">IAOP Developer Portal</a>
+    <span class="env-badge">DEV</span>
+    <nav>
+      <span class="session-state" id="session-note">Signed in</span>
+    </nav>
   </div>
-  <div class="container">
-    <div class="section-title">Frontend APIs</div>
-    <div class="grid" id="frontend-grid"></div>
-    <div class="section-title">Backend APIs</div>
-    <div id="backend-sections"></div>
-  </div>
-  <script>
-    fetch('/api/v1/catalog').then(r => r.json()).then(catalog => {
-      const fg = document.getElementById('frontend-grid');
-      (catalog.frontend || []).forEach(group => {
-        group.services.forEach(svc => {
-          const a = document.createElement('a');
-          a.href = '/reference/frontend/' + svc.id;
-          a.className = 'card';
-          const lc = svc.lifecycle || 'proposed';
-          a.innerHTML = '<div class="card-name">' + svc.name + '</div>'
-            + '<div class="card-desc">' + (svc.description || '').substring(0, 120) + '</div>'
-            + '<div class="card-meta">'
-            + '<span class="tag tag-frontend">Frontend</span>'
-            + '<span class="tag ' + (lc === 'active' ? 'tag-active' : 'tag-proposed') + '">' + lc + '</span>'
-            + '<span class="tag" style="background:#1e2433;color:#94a3b8">v' + svc.apiVersion + '</span>'
-            + '</div>';
-          fg.appendChild(a);
-        });
-      });
-      const bs = document.getElementById('backend-sections');
-      (catalog.backend || []).forEach(group => {
-        const gl = document.createElement('div');
-        gl.className = 'group-label';
-        gl.textContent = group.label;
-        bs.appendChild(gl);
-        const grid = document.createElement('div');
-        grid.className = 'grid';
-        group.services.forEach(svc => {
-          const a = document.createElement('a');
-          a.href = '/reference/backend/' + svc.id;
-          a.className = 'card';
-          const lc = svc.lifecycle || 'proposed';
-          a.innerHTML = '<div class="card-name">' + svc.name + '</div>'
-            + '<div class="card-desc">' + (svc.description || '').substring(0, 120) + '</div>'
-            + '<div class="card-meta">'
-            + '<span class="tag tag-backend">Backend</span>'
-            + '<span class="tag ' + (lc === 'active' ? 'tag-active' : 'tag-proposed') + '">' + lc + '</span>'
-            + '<span class="tag" style="background:#1e2433;color:#94a3b8">v' + svc.apiVersion + '</span>'
-            + '</div>';
-          grid.appendChild(a);
-        });
-        bs.appendChild(grid);
-      });
-    });
-  </script>
+  <main class="portal-main">
+    <div class="page-intro">
+      <h1>API Catalog</h1>
+      <p>Frontend BFF contracts and backend domain-service contracts for the IAOP platform. Select a service to open its Scalar API reference.</p>
+    </div>
+
+    <div class="section-title">Frontend APIs <span class="count" id="frontend-count"></span></div>
+    <div id="frontend-groups" aria-live="polite"></div>
+
+    <div class="section-title">Backend APIs <span class="count" id="backend-count"></span></div>
+    <div id="backend-sections" aria-live="polite"></div>
+  </main>
+  <noscript>
+    <div class="portal-main"><div class="state-box">JavaScript is required to render the API catalog.</div></div>
+  </noscript>
+  <script src="/static/portal.js" defer></script>
 </body>
 </html>"#;

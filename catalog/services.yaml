@@ -80,7 +80,7 @@ services:
   lifecycle: active
   implementationStatus: implemented_unverified
   deploymentStatus: deployed
-  verificationStatus: not_verified
+  verificationStatus: unit_verified
   specPath: specs/development/agency-service/openapi.json
   sourceRef: development
   sourceCommit: e3f703e37d28d2c369833337b0595b65f72dc770
@@ -89,7 +89,7 @@ services:
   domainOwner: Agency Hierarchy Team
   serverUrl: https://api-dev.iaop.internal/agency-service
   description: Organizational hierarchy, assignments, agency leadership, and effective-dated
-    relationships.
+    relationships. Resource-level organizational scope authorization enforced.
 
 - id: integration-service
   name: "IAOP Integration Service"
@@ -206,12 +206,12 @@ services:
   repository: AGENTAPR/iaop-eligibility-service
   environment: development
   visibility: internal
-  maturity: proposed_contract
+  maturity: implemented_unverified
   catalog: backend
   boundedContext: "Integration & Platform"
-  lifecycle: proposed
-  implementationStatus: proposed
-  deploymentStatus: not_deployed
+  lifecycle: active
+  implementationStatus: implemented_unverified
+  deploymentStatus: deployed
   verificationStatus: not_verified
   specPath: specs/development/eligibility-service/openapi.json
   sourceRef: development
@@ -221,7 +221,8 @@ services:
   domainOwner: Underwriting & Compliance Team
   serverUrl: https://api-dev.iaop.internal/eligibility-service
   description: Real-time selling eligibility checks, product accreditation rules,
-    and license validation.
+    and license validation. Currently deployed with a minimal contract
+    (system info + health); business endpoints pending.
 
 - id: sales-service
   name: "IAOP Sales Service"
@@ -420,3 +421,26 @@ services:
   serverUrl: https://api-dev.iaop.internal/api-gateway
   description: Edge routing, rate limiting, TLS termination, API key validation, and
     token verification.
+
+- id: customer-bff
+  name: "AGENA Customer BFF"
+  repository: AGENTAPR/agena-customer-web
+  environment: development
+  visibility: restricted
+  maturity: proposed_contract
+  catalog: frontend
+  channel: customer
+  boundedContext: "Customer Self-Service"
+  lifecycle: proposed
+  implementationStatus: proposed
+  deploymentStatus: not_deployed
+  verificationStatus: not_verified
+  specPath: specs/development/customer-bff/openapi.json
+  sourceRef: development
+  sourceCommit: null
+  apiVersion: 0.1.0
+  enabled: true
+  domainOwner: Customer Experience Team
+  serverUrl: https://api-dev.iaop.internal/customer-bff
+  description: Planned customer-facing BFF for self-service journeys. Contract placeholder
+    only — no implementation deployed.

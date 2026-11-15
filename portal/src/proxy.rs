@@ -117,8 +117,8 @@ async fn proxy_handler(
         .map_err(|_| PortalError::Internal("upstream timeout".into()))?
         .map_err(|e| PortalError::Internal(format!("upstream error: {e}")))?;
 
-    let status = StatusCode::from_u16(upstream.status().as_u16())
-        .unwrap_or(StatusCode::BAD_GATEWAY);
+    let status =
+        StatusCode::from_u16(upstream.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
     let mut builder = Response::builder().status(status);
     for name in RETURN_HEADERS {
         if let Ok(hn) = HeaderName::from_bytes(name.as_bytes()) {

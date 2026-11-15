@@ -32,7 +32,7 @@ fn setup_test_state() -> AppState {
         allowed_visibility: vec!["public".into(), "internal".into(), "restricted".into()],
         public_base_url: None,
         allowed_cors_origins: vec![],
-                scalar_js_path: PathBuf::from("portal/tests/fixtures/scalar.min.js"),
+        scalar_js_path: PathBuf::from("portal/tests/fixtures/scalar.min.js"),
         oidc_issuer: None,
         oidc_client_id: None,
         oidc_client_secret: None,
@@ -225,14 +225,16 @@ async fn cors_wildcard_only_in_dev_mode_no_origins_configured() {
 const TEST_SESSION_ID: &str = "test-portal-session";
 
 fn seed_session(state: &AppState) {
-    state.auth_store.put_session(iaop_developer_portal::auth::PortalSession {
-        session_id: TEST_SESSION_ID.into(),
-        subject: "test-subject".into(),
-        display_name: "Test User".into(),
-        email: None,
-        roles: vec!["portal-api-tester".into()],
-        created_at: std::time::Instant::now(),
-    });
+    state
+        .auth_store
+        .put_session(iaop_developer_portal::auth::PortalSession {
+            session_id: TEST_SESSION_ID.into(),
+            subject: "test-subject".into(),
+            display_name: "Test User".into(),
+            email: None,
+            roles: vec!["portal-api-tester".into()],
+            created_at: std::time::Instant::now(),
+        });
 }
 
 async fn inject_test_session(
