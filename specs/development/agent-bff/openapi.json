@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "AGENA \u2014 Insurance Agent Experience BFF API",
+    "title": "AGENA — Insurance Agent Experience BFF API",
     "version": "1.0.0",
     "description": "Complete production Backend-for-Frontend (BFF) API serving the AGENA Insurance Agent Lifecycle Platform. Implements session-cookie authentication, CSRF double-submit protection, and standard envelopes.",
     "contact": {
@@ -126,7 +126,7 @@
         }
       }
     },
-    "/workspaces": {
+    "/me/workspaces": {
       "get": {
         "tags": [
           "Identity & Workspace"
@@ -162,7 +162,7 @@
         }
       }
     },
-    "/workspaces/select": {
+    "/me/workspaces/select": {
       "post": {
         "tags": [
           "Identity & Workspace"
@@ -229,7 +229,7 @@
         }
       }
     },
-    "/preferences": {
+    "/me/preferences": {
       "get": {
         "tags": [
           "Identity & Workspace"
@@ -366,7 +366,7 @@
         }
       }
     },
-    "/tasks": {
+    "/me/tasks": {
       "get": {
         "tags": [
           "Today Dashboard"
@@ -411,7 +411,7 @@
         ]
       }
     },
-    "/tasks/{id}": {
+    "/me/tasks/{taskId}": {
       "patch": {
         "tags": [
           "Today Dashboard"
@@ -460,7 +460,7 @@
         },
         "parameters": [
           {
-            "name": "id",
+            "name": "taskId",
             "in": "path",
             "required": true,
             "schema": {
@@ -488,7 +488,7 @@
         }
       }
     },
-    "/agenda": {
+    "/me/agenda": {
       "get": {
         "tags": [
           "Today Dashboard"
@@ -570,7 +570,7 @@
         ]
       }
     },
-    "/notifications": {
+    "/me/notifications": {
       "get": {
         "tags": [
           "Utilities & Support"
@@ -615,7 +615,7 @@
         ]
       }
     },
-    "/notifications/{id}/read": {
+    "/me/notifications/{notificationId}/read": {
       "post": {
         "tags": [
           "Utilities & Support"
@@ -664,7 +664,7 @@
         },
         "parameters": [
           {
-            "name": "id",
+            "name": "notificationId",
             "in": "path",
             "required": true,
             "schema": {
@@ -964,7 +964,7 @@
         }
       }
     },
-    "/onboarding/tasks/{id}/submit": {
+    "/onboarding/tasks/{taskId}/submit": {
       "post": {
         "tags": [
           "Onboarding"
@@ -1013,7 +1013,7 @@
         },
         "parameters": [
           {
-            "name": "id",
+            "name": "taskId",
             "in": "path",
             "required": true,
             "schema": {
@@ -1116,7 +1116,7 @@
         }
       }
     },
-    "/documents/complete": {
+    "/documents/{documentId}/complete": {
       "post": {
         "tags": [
           "Documents"
@@ -1183,7 +1183,7 @@
         }
       }
     },
-    "/documents/{id}/download-intent": {
+    "/documents/{documentId}/download-intent": {
       "get": {
         "tags": [
           "Documents"
@@ -1219,7 +1219,7 @@
         },
         "parameters": [
           {
-            "name": "id",
+            "name": "documentId",
             "in": "path",
             "required": true,
             "schema": {
@@ -1265,7 +1265,7 @@
         }
       }
     },
-    "/learning/courses/{id}/enroll": {
+    "/learning/courses/{courseId}/enroll": {
       "post": {
         "tags": [
           "Learning"
@@ -1314,7 +1314,7 @@
         },
         "parameters": [
           {
-            "name": "id",
+            "name": "courseId",
             "in": "path",
             "required": true,
             "schema": {
@@ -1657,7 +1657,7 @@
         }
       }
     },
-    "/customers/{id}": {
+    "/customers/{customerId}": {
       "get": {
         "tags": [
           "Customers"
@@ -1693,7 +1693,7 @@
         },
         "parameters": [
           {
-            "name": "id",
+            "name": "customerId",
             "in": "path",
             "required": true,
             "schema": {
@@ -1703,7 +1703,7 @@
         ]
       }
     },
-    "/products": {
+    "/sales/products": {
       "get": {
         "tags": [
           "Sales & Products"
@@ -1739,7 +1739,7 @@
         }
       }
     },
-    "/illustrations/calculate": {
+    "/sales/illustrations": {
       "post": {
         "tags": [
           "Sales & Products"
@@ -1815,7 +1815,7 @@
         }
       }
     },
-    "/proposals": {
+    "/sales/proposals": {
       "post": {
         "tags": [
           "Sales & Products"
@@ -1889,40 +1889,6 @@
             }
           }
         }
-      },
-      "get": {
-        "tags": [
-          "Sales & Products"
-        ],
-        "summary": "List agent proposals",
-        "operationId": "listProposals",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful operation wrapped in canonical frontend envelope",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthenticated access - missing or expired session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardErrorEnvelope"
-                }
-              }
-            }
-          }
-        }
       }
     },
     "/policies": {
@@ -1961,7 +1927,7 @@
         }
       }
     },
-    "/policies/{id}": {
+    "/policies/{policyId}": {
       "get": {
         "tags": [
           "Policies"
@@ -1997,7 +1963,7 @@
         },
         "parameters": [
           {
-            "name": "id",
+            "name": "policyId",
             "in": "path",
             "required": true,
             "schema": {
@@ -2041,87 +2007,9 @@
             }
           }
         }
-      },
-      "post": {
-        "tags": [
-          "Claims Assistance"
-        ],
-        "summary": "Intake claim assistance submission",
-        "operationId": "createClaim",
-        "security": [
-          {
-            "sessionCookie": []
-          },
-          {
-            "csrfToken": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful operation wrapped in canonical frontend envelope",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthenticated access - missing or expired session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardErrorEnvelope"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "CSRF verification failed or forbidden workspace",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "policy_id",
-                  "incident_date",
-                  "claim_type",
-                  "claimed_amount"
-                ],
-                "properties": {
-                  "policy_id": {
-                    "type": "string"
-                  },
-                  "incident_date": {
-                    "type": "string",
-                    "format": "date"
-                  },
-                  "claim_type": {
-                    "type": "string"
-                  },
-                  "claimed_amount": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        }
       }
     },
-    "/claims/{id}": {
+    "/claims/{claimId}": {
       "get": {
         "tags": [
           "Claims Assistance"
@@ -2157,7 +2045,7 @@
         },
         "parameters": [
           {
-            "name": "id",
+            "name": "claimId",
             "in": "path",
             "required": true,
             "schema": {
@@ -2311,7 +2199,7 @@
         }
       }
     },
-    "/operations/{id}": {
+    "/operations/{operationId}": {
       "get": {
         "tags": [
           "Operations & Status"
@@ -2347,7 +2235,7 @@
         },
         "parameters": [
           {
-            "name": "id",
+            "name": "operationId",
             "in": "path",
             "required": true,
             "schema": {
@@ -2429,13 +2317,13 @@
         }
       }
     },
-    "/auth/login": {
+    "/system/info": {
       "get": {
         "tags": [
-          "Authentication & Session"
+          "System"
         ],
-        "summary": "Initiate OIDC Authorization Code + PKCE login flow",
-        "operationId": "authLogin",
+        "summary": "Get service version and environment metadata",
+        "operationId": "systemInfo",
         "security": [
           {
             "sessionCookie": []
@@ -2465,67 +2353,13 @@
         }
       }
     },
-    "/auth/callback": {
-      "get": {
-        "tags": [
-          "Authentication & Session"
-        ],
-        "summary": "OIDC OAuth2 callback receiver",
-        "operationId": "authCallback",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful operation wrapped in canonical frontend envelope",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardEnvelope"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthenticated access - missing or expired session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardErrorEnvelope"
-                }
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "code",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "state",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ]
-      }
-    },
-    "/auth/logout": {
+    "/claims/assistance": {
       "post": {
         "tags": [
-          "Authentication & Session"
+          "Claims & Policies"
         ],
-        "summary": "Revoke session and clear cookies",
-        "operationId": "authLogout",
+        "summary": "Request claim assistance",
+        "operationId": "postClaimsAssistance",
         "security": [
           {
             "sessionCookie": []
@@ -2565,16 +2399,26 @@
               }
             }
           }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
         }
       }
     },
-    "/auth/session": {
+    "/recruitment/candidates/{candidateId}": {
       "get": {
         "tags": [
-          "Authentication & Session"
+          "Recruitment"
         ],
-        "summary": "Inspect current session TTL and CSRF token",
-        "operationId": "authSession",
+        "summary": "Get recruitment candidate detail",
+        "operationId": "getRecruitmentCandidatesCandidateid",
         "security": [
           {
             "sessionCookie": []
@@ -2600,17 +2444,37 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "candidateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
-    "/system/info": {
+    "/learning/courses/{courseId}": {
       "get": {
         "tags": [
-          "System"
+          "Learning & Certification"
         ],
-        "summary": "Get service version and environment metadata",
-        "operationId": "systemInfo",
+        "summary": "Get learning course detail",
+        "operationId": "getLearningCoursesCourseid",
         "security": [
           {
             "sessionCookie": []
@@ -2636,60 +2500,84 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/health/live": {
-      "get": {
-        "tags": [
-          "System"
-        ],
-        "summary": "Liveness probe",
-        "operationId": "getHealthLive",
-        "responses": {
-          "200": {
-            "description": "Process is alive",
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string"
-                    }
-                  }
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
                 }
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "courseId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
-    "/health/ready": {
+    "/sales/proposals/{proposalId}": {
       "get": {
         "tags": [
-          "System"
+          "Sales & Products"
         ],
-        "summary": "Readiness probe",
-        "operationId": "getHealthReady",
+        "summary": "Get insurance proposal detail",
+        "operationId": "getSalesProposalsProposalid",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Service is ready to serve traffic",
+            "description": "Successful operation wrapped in canonical frontend envelope",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string"
-                    }
-                  }
+                  "$ref": "#/components/schemas/StandardEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated access - missing or expired session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF verification failed or forbidden workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardErrorEnvelope"
                 }
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "proposalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     }
   },

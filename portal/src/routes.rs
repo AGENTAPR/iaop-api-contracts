@@ -326,7 +326,6 @@ fn scalar_html(meta: &crate::catalog::ServiceMeta, spec_url: &str) -> String {
     };
     let safe_section = html_escape(section);
     let safe_auth_note = html_escape(auth_note);
-    let safe_repo = html_escape(&meta.repository);
     let status_bits: Vec<String> = [
         meta.implementation_status.as_deref(),
         meta.deployment_status.as_deref(),
