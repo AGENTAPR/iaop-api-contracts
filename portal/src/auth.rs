@@ -435,12 +435,14 @@ pub async fn me(State(state): State<AppState>, headers: HeaderMap) -> Response {
     }
 }
 
-/// POST /auth/logout — invalidate portal session.
+/// POST /auth/logout — invalidate portal session AND the Keycloak SSO session.
 ///
 /// CSRF protection: validates that the request Origin matches the configured
 /// public base URL. Cross-origin logout requests are rejected with 403.
-/// Only the portal-local session is invalidated; Keycloak SSO sessions remain
-/// active unless the client separately calls the Keycloak end_session endpoint.
+/// After dropping the portal-local session, the browser is sent through
+/// Keycloak's end_session endpoint so the SSO session cannot silently
+/// re-authenticate the user; Keycloak then returns to the portal, which
+/// restarts the login flow.
 pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
     // Origin check: reject cross-origin logout attempts (CSRF protection).
     let allowed_origin = state
@@ -472,7 +474,24 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Respon
     if let Some(sid) = read_cookie(&headers, SESSION_COOKIE) {
         state.auth_store.drop_session(sid);
     }
-    let mut resp = Redirect::to("/").into_response();
+    // End the Keycloak SSO session too; otherwise the next /auth/login would
+    // silently re-authenticate via the still-active SSO cookie.
+    let target = match (&state.config.oidc_issuer, &state.config.oidc_client_id) {
+        (Some(issuer), Some(client_id)) => {
+            let base = state
+                .config
+                .public_base_url
+                .as_deref()
+                .unwrap_or("http://localhost")
+                .trim_end_matches('/');
+            format!(
+                "{issuer}/protocol/openid-connect/logout?client_id={client_id}&post_logout_redirect_uri={}",
+                urlencoding(&format!("{base}/"))
+            )
+        }
+        _ => "/".to_string(),
+    };
+    let mut resp = Redirect::to(&target).into_response();
     let secure = secure_cookies(&state);
     resp.headers_mut().append(
         header::SET_COOKIE,
