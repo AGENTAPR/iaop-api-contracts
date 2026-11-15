@@ -18,6 +18,11 @@ jsonschema = "0.29"
 thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
 mime_guess = "2"
+reqwest = { version = "0.12", features = ["json"] }
+rand = "0.8"
+sha2 = "0.10"
+base64 = "0.22"
+iaop-security = { git = "https://github.com/AGENTAPR/iaop-rust-common", branch = "development" }
 
 [dev-dependencies]
 reqwest = { version = "0.12", features = ["json"] }

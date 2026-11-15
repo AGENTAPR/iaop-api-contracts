@@ -42,6 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState {
         config: config.clone(),
         catalog: Arc::new(catalog),
+        auth_store: iaop_developer_portal::auth::make_store(),
     };
 
     let app = build_router(state);

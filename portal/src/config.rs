@@ -57,6 +57,39 @@ pub struct AppConfig {
         default_value = "/app/static/scalar.min.js"
     )]
     pub scalar_js_path: PathBuf,
+
+    // --- Portal SSO (OIDC auth-code + PKCE) ---
+    #[arg(long, env = "OIDC_ISSUER")]
+    pub oidc_issuer: Option<String>,
+
+    #[arg(long, env = "OIDC_CLIENT_ID")]
+    pub oidc_client_id: Option<String>,
+
+    #[arg(long, env = "OIDC_CLIENT_SECRET")]
+    pub oidc_client_secret: Option<String>,
+
+    #[arg(long, env = "OIDC_REDIRECT_URI")]
+    pub oidc_redirect_uri: Option<String>,
+
+    #[arg(long, env = "OIDC_JWKS_URL")]
+    pub oidc_jwks_url: Option<String>,
+
+    /// Realm role required to use the API-testing proxy routes.
+    #[arg(long, env = "PORTAL_TESTER_ROLE", default_value = "portal-api-tester")]
+    pub portal_tester_role: String,
+
+    // --- Controlled DEV API proxy upstreams (empty = route disabled) ---
+    #[arg(long, env = "UPSTREAM_AGENT_BFF")]
+    pub upstream_agent_bff: Option<String>,
+
+    #[arg(long, env = "UPSTREAM_AGENT_SERVICE")]
+    pub upstream_agent_service: Option<String>,
+
+    #[arg(long, env = "UPSTREAM_AGENCY_SERVICE")]
+    pub upstream_agency_service: Option<String>,
+
+    #[arg(long, env = "UPSTREAM_ELIGIBILITY_SERVICE")]
+    pub upstream_eligibility_service: Option<String>,
 }
 
 impl Default for AppConfig {
@@ -76,6 +109,16 @@ impl Default for AppConfig {
             public_base_url: None,
             allowed_cors_origins: vec![],
             scalar_js_path: PathBuf::from("/app/static/scalar.min.js"),
+            oidc_issuer: None,
+            oidc_client_id: None,
+            oidc_client_secret: None,
+            oidc_redirect_uri: None,
+            oidc_jwks_url: None,
+            portal_tester_role: "portal-api-tester".to_string(),
+            upstream_agent_bff: None,
+            upstream_agent_service: None,
+            upstream_agency_service: None,
+            upstream_eligibility_service: None,
         }
     }
 }

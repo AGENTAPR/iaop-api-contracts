@@ -3,16 +3,18 @@ use axum::{
     http::{header, HeaderMap, HeaderValue, Method, StatusCode},
     middleware,
     response::{Html, IntoResponse, Redirect, Response},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use std::{fs, sync::Arc};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::{
+    auth,
     catalog::{build_dual_catalog, build_scalar_config, ServiceCatalog},
     config::AppConfig,
     errors::PortalError,
+    proxy::proxy_router,
     security::{sanitize_path, security_headers_middleware},
 };
 
@@ -24,6 +26,7 @@ use crate::{
 pub struct AppState {
     pub config: AppConfig,
     pub catalog: Arc<ServiceCatalog>,
+    pub auth_store: auth::SharedStore,
 }
 
 // ---------------------------------------------------------------------------
@@ -34,7 +37,19 @@ pub fn build_router(state: AppState) -> Router {
     // CORS: explicit allowlist when configured; wildcard as dev fallback only.
     let cors = build_cors(&state.config.allowed_cors_origins);
 
-    Router::new()
+    // Public routes: health probes and the OIDC login flow only.
+    let public = Router::new()
+        .route("/health/live", get(health_live))
+        .route("/health/ready", get(health_ready))
+        .route("/auth/login", get(auth::login))
+        .route("/auth/callback", get(auth::callback))
+        .route("/auth/session", get(auth::session_info))
+        .route("/auth/me", get(auth::me))
+        .route("/auth/logout", post(auth::logout));
+
+    // Protected routes: everything that exposes catalog, documentation,
+    // specs, or the Scalar UI requires an authenticated portal session.
+    let protected = Router::new()
         // Landing page
         .route("/", get(landing_page))
         // Scalar API Reference views
@@ -45,9 +60,6 @@ pub fn build_router(state: AppState) -> Router {
         // Backward-compat redirect from old Swagger UI URLs
         .route("/swagger-ui", get(swagger_compat_redirect))
         .route("/swagger-ui/", get(swagger_compat_redirect))
-        // Health probes
-        .route("/health/live", get(health_live))
-        .route("/health/ready", get(health_ready))
         // Catalog API
         .route("/api/v1/catalog", get(get_dual_catalog))
         .route("/api/v1/catalog/frontend", get(get_frontend_catalog))
@@ -59,6 +71,21 @@ pub fn build_router(state: AppState) -> Router {
         .route("/specs/{*spec_path}", get(serve_spec_file))
         // Bundled Scalar JS (served from filesystem, immutable cache)
         .route("/static/scalar.min.js", get(serve_scalar_js))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::require_session,
+        ));
+
+    // API-testing proxy: requires session AND the portal-api-tester role.
+    let proxy = proxy_router().route_layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth::require_api_tester,
+    ));
+
+    Router::new()
+        .merge(public)
+        .merge(protected)
+        .merge(proxy)
         .layer(middleware::from_fn(security_headers_middleware))
         .layer(cors)
         .with_state(state)
@@ -328,8 +355,13 @@ async fn serve_spec_file(
     let req_path = std::path::Path::new(&spec_path);
     let resolved_path = sanitize_path(&state.config.specs_dir, req_path)?;
 
-    let content = fs::read(&resolved_path)
+    let raw = fs::read(&resolved_path)
         .map_err(|e| PortalError::Internal(format!("Failed to read spec file: {}", e)))?;
+
+    // Rewrite server URLs to the controlled DEV proxy and inject the
+    // Keycloak OAuth2 (auth-code + PKCE) scheme for backend APIs so Scalar
+    // can execute real authorized requests without manual token handling.
+    let content = transform_spec_for_testing(&state, &spec_path, &raw);
 
     let content_type = if spec_path.ends_with(".yaml") || spec_path.ends_with(".yml") {
         "application/yaml"
@@ -345,6 +377,120 @@ async fn serve_spec_file(
     );
 
     Ok((StatusCode::OK, headers, content).into_response())
+}
+
+// ---------------------------------------------------------------------------
+// Spec transformation for API testing (server rewrite + OAuth injection)
+// ---------------------------------------------------------------------------
+
+/// Maps a catalog service id to its DEV audience client-scope (`aud-*`).
+fn audience_scope_for(service_id: &str) -> Option<&'static str> {
+    match service_id {
+        "agent-service" => Some("aud-agent"),
+        "agency-service" => Some("aud-agency"),
+        "eligibility-service" => Some("aud-eligibility"),
+        _ => None,
+    }
+}
+
+/// Returns the portal-relative proxy base for a service, but only when the
+/// corresponding upstream is configured (empty upstream = testing disabled).
+fn proxy_base_for<'a>(state: &'a AppState, service_id: &str) -> Option<String> {
+    let portal = state.config.public_base_url.as_deref()?.trim_end_matches('/');
+    match service_id {
+        "agent-bff" if state.config.upstream_agent_bff.is_some() => {
+            Some(format!("{portal}/agent-bff/api/v1"))
+        }
+        "agent-service" if state.config.upstream_agent_service.is_some() => {
+            Some(format!("{portal}/dev-api/agent"))
+        }
+        "agency-service" if state.config.upstream_agency_service.is_some() => {
+            Some(format!("{portal}/dev-api/agency"))
+        }
+        "eligibility-service" if state.config.upstream_eligibility_service.is_some() => {
+            Some(format!("{portal}/dev-api/eligibility"))
+        }
+        _ => None,
+    }
+}
+
+/// Rewrites `servers` to the controlled proxy and injects a Keycloak
+/// OAuth2 authorization-code + PKCE security scheme for backend specs.
+/// Returns the original bytes unchanged for YAML specs, unknown services,
+/// or when no portal base URL is configured.
+fn transform_spec_for_testing(state: &AppState, spec_path: &str, raw: &[u8]) -> Vec<u8> {
+    if spec_path.ends_with(".yaml") || spec_path.ends_with(".yml") {
+        return raw.to_vec();
+    }
+    let catalog_path = format!("specs/{spec_path}");
+    let Some(entry) = state
+        .catalog
+        .services
+        .iter()
+        .find(|s| s.spec_path == catalog_path && s.enabled)
+    else {
+        return raw.to_vec();
+    };
+    let Some(portal) = state
+        .config
+        .public_base_url
+        .as_deref()
+        .map(|u| u.trim_end_matches('/').to_string())
+    else {
+        return raw.to_vec();
+    };
+    let Ok(mut doc) = serde_json::from_slice::<serde_json::Value>(raw) else {
+        return raw.to_vec();
+    };
+
+    // 1. Server rewrite: browser must reach upstreams through the portal
+    //    proxy (domain services have no public ports).
+    let is_backend = entry.catalog.as_deref().unwrap_or("backend") == "backend";
+    if let Some(base) = proxy_base_for(state, &entry.id) {
+        doc["servers"] = serde_json::json!([{ "url": base }]);
+    }
+
+    // 2. OAuth injection for backend APIs only. Frontend BFF specs use the
+    //    server-managed session cookie + CSRF model instead.
+    if is_backend {
+        if let Some(issuer) = &state.config.oidc_issuer {
+            let issuer = issuer.trim_end_matches('/');
+            let mut scopes = serde_json::Map::new();
+            for (k, v) in [
+                ("openid", "OpenID Connect"),
+                ("profile", "User profile"),
+                ("email", "Email address"),
+            ] {
+                scopes.insert(k.into(), serde_json::Value::String(v.into()));
+            }
+            let mut selected = vec!["openid".to_string()];
+            if let Some(aud) = audience_scope_for(&entry.id) {
+                scopes.insert(aud.into(), serde_json::Value::String(format!("Audience: {aud}")));
+                selected.push(aud.to_string());
+            }
+            let redirect = format!("{portal}/reference/backend/{}", entry.id);
+            let scheme = serde_json::json!({
+                "type": "oauth2",
+                "description": "Keycloak Authorization Code + PKCE (public client iaop-scalar-dev)",
+                "flows": {
+                    "authorizationCode": {
+                        "authorizationUrl": format!("{issuer}/protocol/openid-connect/auth"),
+                        "tokenUrl": format!("{issuer}/protocol/openid-connect/token"),
+                        "x-usePkce": "SHA-256",
+                        "x-scalar-client-id": "iaop-scalar-dev",
+                        "x-scalar-redirect-uri": redirect,
+                        "x-scalar-credentials-location": "body",
+                        "scopes": scopes,
+                        "selectedScopes": selected,
+                    }
+                }
+            });
+            doc["components"]["securitySchemes"]["keycloakOAuth"] = scheme;
+            doc["security"] = serde_json::json!([{ "keycloakOAuth": [] }]);
+        }
+    }
+
+    serde_json::to_vec(&doc).unwrap_or_else(|_| raw.to_vec())
 }
 
 // ---------------------------------------------------------------------------

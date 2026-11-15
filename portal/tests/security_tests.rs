@@ -32,13 +32,26 @@ fn setup_test_state() -> AppState {
         allowed_visibility: vec!["public".into(), "internal".into(), "restricted".into()],
         public_base_url: None,
         allowed_cors_origins: vec![],
-        scalar_js_path: PathBuf::from("portal/tests/fixtures/scalar.min.js"),
+                scalar_js_path: PathBuf::from("portal/tests/fixtures/scalar.min.js"),
+        oidc_issuer: None,
+        oidc_client_id: None,
+        oidc_client_secret: None,
+        oidc_redirect_uri: None,
+        oidc_jwks_url: None,
+        portal_tester_role: "portal-api-tester".into(),
+        upstream_agent_bff: None,
+        upstream_agent_service: None,
+        upstream_agency_service: None,
+        upstream_eligibility_service: None,
     };
 
-    AppState {
+    let state = AppState {
         config,
         catalog: Arc::new(catalog),
-    }
+        auth_store: iaop_developer_portal::auth::make_store(),
+    };
+    seed_session(&state);
+    state
 }
 
 fn setup_test_state_with_cors(origins: Vec<String>) -> AppState {
@@ -79,7 +92,7 @@ fn sanitize_path_rejects_absolute_paths() {
 #[tokio::test]
 async fn http_rejects_path_traversal_attempts() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/specs/development/../../Cargo.toml")
@@ -111,7 +124,7 @@ async fn http_rejects_path_traversal_attempts() {
 #[tokio::test]
 async fn security_headers_present_on_all_responses() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/health/live")
@@ -157,7 +170,7 @@ async fn security_headers_present_on_all_responses() {
 #[tokio::test]
 async fn cors_allows_configured_origin() {
     let state = setup_test_state_with_cors(vec!["https://portal.iaop.internal".to_string()]);
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/health/live")
@@ -190,7 +203,7 @@ async fn cors_wildcard_only_in_dev_mode_no_origins_configured() {
     // When allowed_cors_origins is empty, the portal uses wildcard as a dev fallback.
     // This test documents and verifies that behaviour is intentional and limited.
     let state = setup_test_state_with_cors(vec![]);
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/health/live")
@@ -203,4 +216,38 @@ async fn cors_wildcard_only_in_dev_mode_no_origins_configured() {
         StatusCode::OK,
         "Wildcard dev mode must still serve health endpoint"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Test helpers: seeded portal session + cookie injection
+// ---------------------------------------------------------------------------
+
+const TEST_SESSION_ID: &str = "test-portal-session";
+
+fn seed_session(state: &AppState) {
+    state.auth_store.put_session(iaop_developer_portal::auth::PortalSession {
+        session_id: TEST_SESSION_ID.into(),
+        subject: "test-subject".into(),
+        display_name: "Test User".into(),
+        email: None,
+        roles: vec!["portal-api-tester".into()],
+        created_at: std::time::Instant::now(),
+    });
+}
+
+async fn inject_test_session(
+    mut req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    if !req.headers().contains_key(axum::http::header::COOKIE) {
+        req.headers_mut().insert(
+            axum::http::header::COOKIE,
+            axum::http::HeaderValue::from_static("portal_session=test-portal-session"),
+        );
+    }
+    next.run(req).await
+}
+
+fn test_app(state: AppState) -> axum::Router {
+    build_router(state).layer(axum::middleware::from_fn(inject_test_session))
 }

@@ -29,13 +29,26 @@ fn setup_test_state() -> AppState {
         allowed_cors_origins: vec![],
         // For tests, Scalar JS won't exist on disk — the route will return 500 if hit,
         // but health/catalog/specs tests don't exercise it.
-        scalar_js_path: PathBuf::from("portal/tests/fixtures/scalar.min.js"),
+                scalar_js_path: PathBuf::from("portal/tests/fixtures/scalar.min.js"),
+        oidc_issuer: None,
+        oidc_client_id: None,
+        oidc_client_secret: None,
+        oidc_redirect_uri: None,
+        oidc_jwks_url: None,
+        portal_tester_role: "portal-api-tester".into(),
+        upstream_agent_bff: None,
+        upstream_agent_service: None,
+        upstream_agency_service: None,
+        upstream_eligibility_service: None,
     };
 
-    AppState {
+    let state = AppState {
         config,
         catalog: Arc::new(catalog),
-    }
+        auth_store: iaop_developer_portal::auth::make_store(),
+    };
+    seed_session(&state);
+    state
 }
 
 // ---------------------------------------------------------------------------
@@ -45,7 +58,7 @@ fn setup_test_state() -> AppState {
 #[tokio::test]
 async fn root_serves_landing_page_html() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder().uri("/").body(Body::empty()).unwrap();
     let res = app.oneshot(req).await.unwrap();
@@ -66,7 +79,7 @@ async fn root_serves_landing_page_html() {
 #[tokio::test]
 async fn swagger_ui_redirects_to_reference_frontend() {
     let state = setup_test_state();
-    let app = build_router(state.clone());
+    let app = test_app(state.clone());
 
     // /swagger-ui (no trailing slash)
     let req = Request::builder()
@@ -88,7 +101,7 @@ async fn swagger_ui_redirects_to_reference_frontend() {
         .uri("/swagger-ui/")
         .body(Body::empty())
         .unwrap();
-    let res = build_router(setup_test_state()).oneshot(req).await.unwrap();
+    let res = test_app(setup_test_state()).oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::TEMPORARY_REDIRECT);
     let loc = res
         .headers()
@@ -102,7 +115,7 @@ async fn swagger_ui_redirects_to_reference_frontend() {
 #[tokio::test]
 async fn frontend_index_redirects_to_first_frontend_service() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/reference/frontend")
@@ -127,7 +140,7 @@ async fn frontend_index_redirects_to_first_frontend_service() {
 #[tokio::test]
 async fn reference_frontend_agent_bff_serves_scalar_html() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/reference/frontend/agent-bff")
@@ -168,7 +181,7 @@ async fn reference_frontend_agent_bff_serves_scalar_html() {
 #[tokio::test]
 async fn reference_backend_serves_scalar_html() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/reference/backend/agent-service")
@@ -186,7 +199,7 @@ async fn reference_backend_serves_scalar_html() {
 #[tokio::test]
 async fn reference_nonexistent_service_returns_404() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/reference/frontend/nonexistent-xyz-9999")
@@ -203,7 +216,7 @@ async fn reference_nonexistent_service_returns_404() {
 #[tokio::test]
 async fn health_live_returns_ok() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/health/live")
@@ -219,7 +232,7 @@ async fn health_live_returns_ok() {
 #[tokio::test]
 async fn health_ready_reports_service_count_and_schema_version() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/health/ready")
@@ -248,7 +261,7 @@ async fn health_ready_reports_service_count_and_schema_version() {
 #[tokio::test]
 async fn catalog_endpoint_returns_dual_structure() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/api/v1/catalog")
@@ -300,7 +313,7 @@ async fn catalog_endpoint_returns_dual_structure() {
 #[tokio::test]
 async fn catalog_frontend_endpoint_returns_array() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/api/v1/catalog/frontend")
@@ -319,7 +332,7 @@ async fn catalog_frontend_endpoint_returns_array() {
 #[tokio::test]
 async fn catalog_backend_endpoint_returns_array() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/api/v1/catalog/backend")
@@ -338,7 +351,7 @@ async fn catalog_backend_endpoint_returns_array() {
 #[tokio::test]
 async fn service_meta_endpoint_returns_scalar_config() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/api/v1/services/agent-bff")
@@ -357,7 +370,7 @@ async fn service_meta_endpoint_returns_scalar_config() {
 #[tokio::test]
 async fn service_spec_redirect_works() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/api/v1/services/agent-bff/spec")
@@ -384,7 +397,7 @@ async fn service_spec_redirect_works() {
 #[tokio::test]
 async fn serves_agent_bff_spec_json() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/specs/development/agent-bff/openapi.json")
@@ -405,7 +418,7 @@ async fn serves_agent_bff_spec_json() {
 #[tokio::test]
 async fn serves_agent_service_spec_json() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/specs/development/agent-service/openapi.json")
@@ -421,7 +434,7 @@ async fn serves_agent_service_spec_json() {
 #[tokio::test]
 async fn nonexistent_spec_returns_404() {
     let state = setup_test_state();
-    let app = build_router(state);
+    let app = test_app(state);
 
     let req = Request::builder()
         .uri("/specs/development/nonexistent-service-123/openapi.json")
@@ -429,4 +442,38 @@ async fn nonexistent_spec_returns_404() {
         .unwrap();
     let res = app.oneshot(req).await.unwrap();
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+// ---------------------------------------------------------------------------
+// Test helpers: seeded portal session + cookie injection
+// ---------------------------------------------------------------------------
+
+const TEST_SESSION_ID: &str = "test-portal-session";
+
+fn seed_session(state: &AppState) {
+    state.auth_store.put_session(iaop_developer_portal::auth::PortalSession {
+        session_id: TEST_SESSION_ID.into(),
+        subject: "test-subject".into(),
+        display_name: "Test User".into(),
+        email: None,
+        roles: vec!["portal-api-tester".into()],
+        created_at: std::time::Instant::now(),
+    });
+}
+
+async fn inject_test_session(
+    mut req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    if !req.headers().contains_key(axum::http::header::COOKIE) {
+        req.headers_mut().insert(
+            axum::http::header::COOKIE,
+            axum::http::HeaderValue::from_static("portal_session=test-portal-session"),
+        );
+    }
+    next.run(req).await
+}
+
+fn test_app(state: AppState) -> axum::Router {
+    build_router(state).layer(axum::middleware::from_fn(inject_test_session))
 }
