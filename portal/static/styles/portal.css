@@ -511,6 +511,82 @@ a.card:focus-visible { outline-offset: 3px; }
 
 .ref-body { flex: 1; background: var(--agena-canvas); }
 
+/* ---------- Agent connection panel (frontend BFF references) ---------- */
+
+.connect-panel {
+  padding: var(--agena-space-3) var(--agena-space-4);
+  border-bottom: 1px solid var(--agena-border);
+  background: var(--agena-surface);
+}
+.cp-card {
+  max-width: var(--agena-content-max);
+  margin: 0 auto;
+  border: 1px solid var(--agena-border);
+  border-radius: var(--agena-radius-lg);
+  background: var(--agena-surface);
+  padding: var(--agena-space-4) var(--agena-space-5);
+}
+.cp-title {
+  font-size: var(--agena-text-compact);
+  font-weight: 650;
+  color: var(--agena-text-primary);
+  margin-bottom: var(--agena-space-3);
+}
+.cp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--agena-space-3);
+  flex-wrap: wrap;
+  padding: var(--agena-space-2) 0;
+  font-size: var(--agena-text-compact);
+}
+.cp-row + .cp-row { border-top: 1px solid var(--agena-border); }
+.cp-label {
+  min-width: 130px;
+  font-weight: 600;
+  color: var(--agena-text-secondary);
+}
+.cp-value { color: var(--agena-text-primary); font-weight: 500; }
+.cp-actions {
+  display: flex;
+  gap: var(--agena-space-2);
+  margin-top: var(--agena-space-3);
+  flex-wrap: wrap;
+}
+.cp-btn {
+  font-family: var(--agena-font);
+  font-size: var(--agena-text-compact);
+  font-weight: 600;
+  padding: var(--agena-space-2) var(--agena-space-4);
+  border-radius: var(--agena-radius-sm);
+  border: 1px solid var(--agena-border-strong);
+  background: var(--agena-surface);
+  color: var(--agena-text-primary);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  transition: background var(--agena-motion-fast) var(--agena-ease),
+              border-color var(--agena-motion-fast) var(--agena-ease);
+}
+.cp-btn:hover { background: var(--agena-surface-subtle); }
+.cp-btn.primary {
+  background: var(--agena-primary);
+  border-color: var(--agena-primary);
+  color: var(--agena-primary-contrast);
+}
+.cp-btn.primary:hover { background: var(--agena-primary-hover); border-color: var(--agena-primary-hover); }
+.cp-btn.danger { color: var(--agena-danger); border-color: var(--agena-danger); }
+.cp-btn.danger:hover { background: var(--agena-danger-soft); }
+.cp-btn:disabled { opacity: 0.6; cursor: default; }
+.cp-note {
+  margin-top: var(--agena-space-3);
+  font-size: var(--agena-text-caption);
+  color: var(--agena-text-tertiary);
+  line-height: 1.5;
+}
+.cp-loading { font-size: var(--agena-text-compact); color: var(--agena-text-secondary); padding: var(--agena-space-2) 0; }
+
 /* --------------------------------------------------------------------------
    Footer
    -------------------------------------------------------------------------- */

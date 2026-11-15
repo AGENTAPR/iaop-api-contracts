@@ -2586,14 +2586,14 @@
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "agena_session_id",
-        "description": "HttpOnly, Secure, SameSite=Lax session cookie issued upon OIDC callback"
+        "name": "__Host-iaop_session",
+        "description": "Opaque HttpOnly Secure SameSite=Lax session cookie issued by the Agent BFF after successful Keycloak OIDC authentication. Managed server-side; never exposed to JavaScript."
       },
       "csrfToken": {
         "type": "apiKey",
         "in": "header",
         "name": "x-csrf-token",
-        "description": "Double-submit cryptographic CSRF token mandatory on all mutating HTTP methods (POST, PUT, PATCH, DELETE)"
+        "description": "Double-submit CSRF token mandatory on all mutating HTTP methods (POST, PUT, PATCH, DELETE). Obtain via GET /agent-bff/auth/session (csrf_token field, requires portal session)."
       }
     },
     "schemas": {

@@ -90,7 +90,10 @@ pub fn proxy_router() -> Router<AppState> {
 pub fn bff_session_router() -> Router<AppState> {
     Router::new()
         .route("/agent-bff/auth/login", axum::routing::get(proxy_handler))
-        .route("/agent-bff/auth/callback", axum::routing::get(proxy_handler))
+        .route(
+            "/agent-bff/auth/callback",
+            axum::routing::get(proxy_handler),
+        )
         .route("/agent-bff/auth/session", axum::routing::get(proxy_handler))
         .route("/agent-bff/auth/me", axum::routing::get(proxy_handler))
         .route("/agent-bff/auth/logout", axum::routing::post(proxy_handler))

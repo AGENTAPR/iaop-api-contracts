@@ -424,6 +424,7 @@ pub async fn me(State(state): State<AppState>, headers: HeaderMap) -> Response {
             "subject": s.subject,
             "displayName": s.display_name,
             "email": s.email,
+            "apiTester": s.has_role(&state.config.portal_tester_role),
         }))
         .into_response(),
         None => (
@@ -647,7 +648,7 @@ mod tests {
             "/static/scripts/portal.js",
             "/dev-api/agent/api/v1/agents",
             "/agent-bff/api/v1/me",
-            "/agent-bff/auth",      // not an exact allowlisted path
+            "/agent-bff/auth", // not an exact allowlisted path
             "/agent-bff/auth/login/extra",
             "/agent-bff/auth/session/anything",
             "/agent-bff/me",

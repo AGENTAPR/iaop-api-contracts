@@ -147,24 +147,17 @@ fn static_asset(path: &str) -> Option<(&'static str, &'static str)> {
     match path {
         "styles/adl-tokens.css" => Some(("text/css; charset=utf-8", ADL_TOKENS_CSS)),
         "styles/portal.css" => Some(("text/css; charset=utf-8", PORTAL_CSS)),
-        "styles/scalar-overrides.css" => {
-            Some(("text/css; charset=utf-8", SCALAR_OVERRIDES_CSS))
-        }
-        "scripts/theme-init.js" => {
-            Some(("application/javascript; charset=utf-8", THEME_INIT_JS))
-        }
+        "styles/scalar-overrides.css" => Some(("text/css; charset=utf-8", SCALAR_OVERRIDES_CSS)),
+        "scripts/theme-init.js" => Some(("application/javascript; charset=utf-8", THEME_INIT_JS)),
         "scripts/theme.js" => Some(("application/javascript; charset=utf-8", THEME_JS)),
-        "scripts/theme-sync.js" => {
-            Some(("application/javascript; charset=utf-8", THEME_SYNC_JS))
-        }
+        "scripts/theme-sync.js" => Some(("application/javascript; charset=utf-8", THEME_SYNC_JS)),
+        "scripts/bff-connect.js" => Some(("application/javascript; charset=utf-8", BFF_CONNECT_JS)),
         "scripts/portal.js" => Some(("application/javascript; charset=utf-8", PORTAL_JS)),
         _ => None,
     }
 }
 
-async fn serve_static_asset(
-    Path(asset): Path<String>,
-) -> Result<impl IntoResponse, PortalError> {
+async fn serve_static_asset(Path(asset): Path<String>) -> Result<impl IntoResponse, PortalError> {
     let (content_type, body) = static_asset(&asset)
         .ok_or_else(|| PortalError::NotFound(format!("Unknown static asset '{asset}'")))?;
     Ok((
@@ -392,6 +385,13 @@ fn scalar_html(meta: &crate::catalog::ServiceMeta, spec_url: &str) -> String {
     let safe_config = html_escape(&scalar_config.to_string());
     let title = format!("{} — IAOP Developer Portal", meta.name);
 
+    // Agent-connection panel is only meaningful for frontend BFF references.
+    let connect_panel = if catalog_kind == "frontend" {
+        r#"<div class="connect-panel" id="bff-connect" aria-live="polite"></div>"#
+    } else {
+        ""
+    };
+
     format!(
         r#"{head}
 <body>
@@ -409,10 +409,12 @@ fn scalar_html(meta: &crate::catalog::ServiceMeta, spec_url: &str) -> String {
       {description}
       <span class="auth-note">{auth_note}</span>
     </div>
+    {connect_panel}
     <div class="ref-body">
       <script id="api-reference" data-url="{url}" data-configuration='{config}'></script>
       <script src="/static/scripts/theme-sync.js"></script>
       <script src="/static/scripts/theme.js" defer></script>
+      {connect_script}
       <script src="/static/scalar.min.js"></script>
     </div>
   </div>
@@ -429,6 +431,12 @@ fn scalar_html(meta: &crate::catalog::ServiceMeta, spec_url: &str) -> String {
         auth_note = safe_auth_note,
         description = description,
         config = safe_config,
+        connect_panel = connect_panel,
+        connect_script = if catalog_kind == "frontend" {
+            r#"<script src="/static/scripts/bff-connect.js" defer></script>"#
+        } else {
+            ""
+        },
     )
 }
 
@@ -704,6 +712,7 @@ static SCALAR_OVERRIDES_CSS: &str = include_str!("../static/styles/scalar-overri
 static THEME_INIT_JS: &str = include_str!("../static/scripts/theme-init.js");
 static THEME_JS: &str = include_str!("../static/scripts/theme.js");
 static THEME_SYNC_JS: &str = include_str!("../static/scripts/theme-sync.js");
+static BFF_CONNECT_JS: &str = include_str!("../static/scripts/bff-connect.js");
 static PORTAL_JS: &str = include_str!("../static/scripts/portal.js");
 
 // ---------------------------------------------------------------------------
@@ -715,7 +724,11 @@ static PORTAL_JS: &str = include_str!("../static/scripts/portal.js");
 /// "backend" | "reference" and controls aria-current on the nav links.
 fn portal_header_html(active: &str) -> String {
     let nav_link = |href: &str, label: &str, key: &str| -> String {
-        let current = if active == key { " aria-current=\"page\"" } else { "" };
+        let current = if active == key {
+            " aria-current=\"page\""
+        } else {
+            ""
+        };
         format!(
             "<a href=\"{href}\"{current}>{label}</a>",
             href = html_escape(href),

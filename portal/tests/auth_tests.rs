@@ -219,7 +219,10 @@ async fn anonymous_html_navigation_redirects_to_login_with_return_to() {
     let app = build_router(setup_state());
     for (uri, expected_dest) in [
         ("/", "%2F"),
-        ("/reference/frontend/agent-bff", "%2Freference%2Ffrontend%2Fagent-bff"),
+        (
+            "/reference/frontend/agent-bff",
+            "%2Freference%2Ffrontend%2Fagent-bff",
+        ),
         (
             "/reference/backend/agency-service",
             "%2Freference%2Fbackend%2Fagency-service",
@@ -243,7 +246,9 @@ async fn anonymous_html_navigation_redirects_to_login_with_return_to() {
 async fn return_to_preserves_path_and_query() {
     let app = build_router(setup_state());
     let res = app
-        .oneshot(req_html("/reference/backend/agency-service?tab=operations&env=dev"))
+        .oneshot(req_html(
+            "/reference/backend/agency-service?tab=operations&env=dev",
+        ))
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::SEE_OTHER);
@@ -292,10 +297,7 @@ async fn anonymous_api_spec_static_and_proxy_stay_json_401() {
     ] {
         let res = app.clone().oneshot(req_html(uri)).await.unwrap();
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED, "{uri}");
-        assert!(
-            location_of(&res).is_empty(),
-            "{uri} must not redirect"
-        );
+        assert!(location_of(&res).is_empty(), "{uri} must not redirect");
         let body = res.into_body().collect().await.unwrap().to_bytes();
         let text = String::from_utf8_lossy(&body);
         assert!(text.contains("UNAUTHENTICATED"), "{uri} body: {text}");
@@ -342,11 +344,7 @@ async fn auth_endpoints_never_redirect_into_middleware() {
     let app = build_router(setup_state());
     // /auth/login is public and must redirect to Keycloak, never loop back
     // through require_session.
-    let res = app
-        .clone()
-        .oneshot(req_html("/auth/login"))
-        .await
-        .unwrap();
+    let res = app.clone().oneshot(req_html("/auth/login")).await.unwrap();
     assert_eq!(res.status(), StatusCode::SEE_OTHER);
     let loc = location_of(&res);
     assert!(
@@ -384,10 +382,8 @@ async fn bff_login_requires_portal_session_not_tester_role() {
             .clone()
             .oneshot({
                 let mut r = req(uri);
-                r.headers_mut().insert(
-                    header::COOKIE,
-                    "portal_session=viewer-bff".parse().unwrap(),
-                );
+                r.headers_mut()
+                    .insert(header::COOKIE, "portal_session=viewer-bff".parse().unwrap());
                 r
             })
             .await
@@ -404,10 +400,8 @@ async fn bff_login_requires_portal_session_not_tester_role() {
         .clone()
         .oneshot({
             let mut r = req("/agent-bff/api/v1/me");
-            r.headers_mut().insert(
-                header::COOKIE,
-                "portal_session=viewer-bff".parse().unwrap(),
-            );
+            r.headers_mut()
+                .insert(header::COOKIE, "portal_session=viewer-bff".parse().unwrap());
             r
         })
         .await
@@ -429,7 +423,9 @@ async fn anonymous_bff_login_denied_but_html_nav_redirects() {
     // Browser navigation -> 303 into portal login with return_to preserved.
     let res = app
         .clone()
-        .oneshot(req_html("/agent-bff/auth/login?return_to=%2Freference%2Ffrontend%2Fagent-bff"))
+        .oneshot(req_html(
+            "/agent-bff/auth/login?return_to=%2Freference%2Ffrontend%2Fagent-bff",
+        ))
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::SEE_OTHER);
@@ -477,10 +473,8 @@ async fn bff_auth_subpaths_are_not_allowlisted() {
         .clone()
         .oneshot({
             let mut r = req("/agent-bff/auth/session/extra");
-            r.headers_mut().insert(
-                header::COOKIE,
-                "portal_session=tester-bff".parse().unwrap(),
-            );
+            r.headers_mut()
+                .insert(header::COOKIE, "portal_session=tester-bff".parse().unwrap());
             r
         })
         .await
@@ -512,8 +506,7 @@ async fn non_html_methods_do_not_redirect() {
     // POST / has no route under the protected layer → 405 from router, but
     // crucially it must NOT be a login redirect. Accept either 405 or 401.
     assert!(
-        res.status() == StatusCode::METHOD_NOT_ALLOWED
-            || res.status() == StatusCode::UNAUTHORIZED,
+        res.status() == StatusCode::METHOD_NOT_ALLOWED || res.status() == StatusCode::UNAUTHORIZED,
         "unexpected {}",
         res.status()
     );
