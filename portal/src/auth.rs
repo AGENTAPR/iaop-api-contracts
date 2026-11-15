@@ -178,7 +178,7 @@ pub async fn login(
     });
 
     let url = format!(
-        "{issuer}/protocol/openid-connect/auth?response_type=code&client_id={client_id}&redirect_uri={}&scope=openid%20profile%20email&state={}&nonce={}&code_challenge={}&code_challenge_method=S256",
+        "{issuer}/protocol/openid-connect/auth?response_type=code&client_id={client_id}&redirect_uri={}&scope=openid%20profile%20email%20roles&state={}&nonce={}&code_challenge={}&code_challenge_method=S256",
         urlencoding(redirect),
         urlencoding(&flow_state),
         urlencoding(&nonce),
