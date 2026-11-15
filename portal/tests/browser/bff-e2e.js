@@ -64,7 +64,32 @@ const check = (n, ok, x='') => { results.push(ok); console.log((ok?'PASS':'FAIL'
   const ls = await p.evaluate(()=>JSON.stringify({ls:Object.keys(localStorage),ss:Object.keys(sessionStorage)}));
   check('no tokens in web storage', !/eyJ|token|jwt/i.test(ls), ls.slice(0,120));
 
-  // 8. Negative: fresh context, portal session but hit BFF API without BFF session
+  // 8. Connect panel on the BFF reference page reflects both identities
+  await p.goto(BASE+'/reference/frontend/agent-bff',{waitUntil:'domcontentloaded'});
+  await p.waitForSelector('#bff-connect .cp-card',{timeout:15000});
+  const panel = await p.evaluate(()=>document.getElementById('bff-connect').innerText);
+  check('connect panel shows developer + connected agent',
+    /Developer Portal/.test(panel) && /Agent BFF/.test(panel) && /connected/.test(panel),
+    panel.replace(/\n+/g,' | ').slice(0,140));
+
+  // 9. Disconnect via CSRF-protected logout, then verify denial
+  const sessBody = JSON.parse(sess.body);
+  const csrf = sessBody.csrf_token || '';
+  const out = await p.evaluate(async(t)=>{
+    const r = await fetch('/agent-bff/auth/logout',{method:'POST',credentials:'same-origin',
+      headers:{'Accept':'application/json','x-csrf-token':t}});
+    return r.status;
+  }, csrf);
+  check('bff logout with csrf', out===200, 'status='+out);
+  const after = await p.evaluate(async()=>{
+    const a = await fetch('/agent-bff/api/v1/me',{credentials:'same-origin'});
+    const s = await fetch('/agent-bff/auth/session',{credentials:'same-origin'});
+    return {api:a.status, sess: await s.text()};
+  });
+  check('bff api after logout → 401', after.api===401, 'status='+after.api);
+  check('bff session reports unauthenticated', /"authenticated"\s*:\s*false/.test(after.sess));
+
+  // 10. Negative: fresh context, portal session but hit BFF API without BFF session
   const ctx2 = await b.newContext({ignoreHTTPSErrors:true});
   const p2 = await ctx2.newPage();
   await p2.goto(BASE+'/',{waitUntil:'domcontentloaded'});
