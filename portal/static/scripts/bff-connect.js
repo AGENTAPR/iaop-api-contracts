@@ -88,7 +88,8 @@
     } else {
       var conn = el('a', 'cp-btn primary', 'Connect agent identity');
       conn.href = '/agent-bff/auth/login?redirect_uri=' +
-        encodeURIComponent(location.origin + '/agent-bff/auth/callback');
+        encodeURIComponent(location.origin + '/agent-bff/auth/callback') +
+        '&return_to=' + encodeURIComponent(location.pathname + location.search);
       actions.appendChild(conn);
     }
     card.appendChild(actions);
