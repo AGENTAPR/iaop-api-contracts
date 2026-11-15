@@ -53,6 +53,9 @@ pub fn build_router(state: AppState) -> Router {
     let protected = Router::new()
         // Landing page
         .route("/", get(landing_page))
+        // Dedicated catalog pages (same design as overview, single section)
+        .route("/frontend-apis", get(frontend_apis_page))
+        .route("/backend-apis", get(backend_apis_page))
         // Scalar API Reference views
         .route("/reference/frontend", get(frontend_index))
         .route("/reference/frontend/{id}", get(frontend_service))
@@ -237,6 +240,88 @@ async fn landing_page() -> impl IntoResponse {
 /// Landing shell with the shared ADL header injected server-side.
 fn landing_html() -> String {
     LANDING_PAGE_HTML.replacen("{header}", &portal_header_html("overview"), 1)
+}
+
+// ---------------------------------------------------------------------------
+// Dedicated catalog pages: /frontend-apis and /backend-apis
+// Same shell/design as the overview landing page, but renders a single
+// catalog section. portal.js is null-safe and only populates sections whose
+// container elements exist.
+// ---------------------------------------------------------------------------
+
+async fn frontend_apis_page() -> impl IntoResponse {
+    Html(catalog_page_html("frontend"))
+}
+
+async fn backend_apis_page() -> impl IntoResponse {
+    Html(catalog_page_html("backend"))
+}
+
+fn catalog_page_html(kind: &str) -> String {
+    let (section_id, title_id, title, desc, grid_id) = if kind == "frontend" {
+        (
+            "frontend-apis",
+            "frontend-title",
+            "Frontend APIs",
+            "Application-facing BFF contracts — what agent, office, and customer clients actually consume. Browser session + CSRF for API testing.",
+            "frontend-groups",
+        )
+    } else {
+        (
+            "backend-apis",
+            "backend-title",
+            "Backend APIs",
+            "Authoritative domain and platform service contracts, grouped by bounded context. OAuth2 Authorization Code + PKCE for API testing.",
+            "backend-sections",
+        )
+    };
+    let page = format!(
+        r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <title>IAOP Developer Portal — {title}</title>
+  <link rel="stylesheet" href="/static/styles/adl-tokens.css" />
+  <link rel="stylesheet" href="/static/styles/portal.css" />
+  <script src="/static/scripts/theme-init.js"></script>
+</head>
+<body>
+  {{header}}
+  <main class="portal-main">
+    <section class="hero" aria-labelledby="hero-title">
+      <h1 id="hero-title">{title}</h1>
+      <p>{desc}</p>
+    </section>
+
+    <section class="catalog-section" id="{section_id}" aria-labelledby="{title_id}">
+      <h2 class="section-title" id="{title_id}">
+        <span>{title}</span>
+        <span class="count" id="{count_id}"></span>
+      </h2>
+      <p class="section-desc">{desc}</p>
+      <div id="{grid_id}" aria-live="polite"></div>
+    </section>
+  </main>
+  <footer class="portal-footer">
+    IAOP Developer Portal · Agena · environment <span class="mono" id="env-footer">development</span>
+  </footer>
+  <noscript>
+    <div class="portal-main"><div class="state-box">JavaScript is required to render the API catalog.</div></div>
+  </noscript>
+  <script src="/static/scripts/theme.js" defer></script>
+  <script src="/static/scripts/portal.js" defer></script>
+</body>
+</html>"#,
+        title = html_escape(title),
+        desc = html_escape(desc),
+        section_id = section_id,
+        title_id = title_id,
+        count_id = if kind == "frontend" { "frontend-count" } else { "backend-count" },
+        grid_id = grid_id,
+    );
+    page.replacen("{header}", &portal_header_html(kind), 1)
 }
 
 // ---------------------------------------------------------------------------
@@ -765,8 +850,8 @@ fn portal_header_html(active: &str) -> String {
   </div>
 </header>"#,
         overview = nav_link("/", "Overview", "overview"),
-        frontend = nav_link("/#frontend-apis", "Frontend APIs", "frontend"),
-        backend = nav_link("/#backend-apis", "Backend APIs", "backend"),
+        frontend = nav_link("/frontend-apis", "Frontend APIs", "frontend"),
+        backend = nav_link("/backend-apis", "Backend APIs", "backend"),
     )
 }
 
