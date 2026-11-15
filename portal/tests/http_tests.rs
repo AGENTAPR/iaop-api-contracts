@@ -459,6 +459,7 @@ fn seed_session(state: &AppState) {
             display_name: "Test User".into(),
             email: None,
             roles: vec!["portal-api-tester".into()],
+            id_token_hint: None,
             created_at: std::time::Instant::now(),
         });
 }

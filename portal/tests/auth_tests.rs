@@ -54,6 +54,7 @@ fn session(state: &AppState, sid: &str, roles: Vec<&str>) {
         display_name: "U".into(),
         email: None,
         roles: roles.into_iter().map(str::to_string).collect(),
+        id_token_hint: None,
         created_at: std::time::Instant::now(),
     });
 }

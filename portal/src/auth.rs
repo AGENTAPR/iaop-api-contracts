@@ -33,6 +33,9 @@ pub struct PortalSession {
     pub email: Option<String>,
     /// Verified realm roles from the validated id_token.
     pub roles: Vec<String>,
+    /// ID token retained server-side solely to build the Keycloak
+    /// end_session id_token_hint on logout. Never sent to the browser.
+    pub id_token_hint: Option<String>,
     pub created_at: Instant,
 }
 
@@ -373,6 +376,7 @@ pub async fn callback(
             .unwrap_or_else(|| claims.sub.clone()),
         email: claims.email.clone(),
         roles,
+        id_token_hint: Some(id_token.to_string()),
         created_at: Instant::now(),
     });
 
@@ -471,6 +475,9 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Respon
             .into_response();
     }
 
+    let id_token_hint = read_cookie(&headers, SESSION_COOKIE)
+        .and_then(|sid| state.auth_store.get_session(sid))
+        .and_then(|s| s.id_token_hint);
     if let Some(sid) = read_cookie(&headers, SESSION_COOKIE) {
         state.auth_store.drop_session(sid);
     }
@@ -484,9 +491,13 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Respon
                 .as_deref()
                 .unwrap_or("http://localhost")
                 .trim_end_matches('/');
+            let hint = id_token_hint
+                .map(|t| format!("&id_token_hint={}", urlencoding(&t)))
+                .unwrap_or_default();
             format!(
-                "{issuer}/protocol/openid-connect/logout?client_id={client_id}&post_logout_redirect_uri={}",
-                urlencoding(&format!("{base}/"))
+                "{issuer}/protocol/openid-connect/logout?client_id={client_id}&post_logout_redirect_uri={}{}",
+                urlencoding(&format!("{base}/")),
+                hint
             )
         }
         _ => "/".to_string(),

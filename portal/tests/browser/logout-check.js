@@ -23,12 +23,14 @@ const check = (n, ok, x='') => { results.push(ok); console.log((ok?'PASS':'FAIL'
   await p.waitForURL(u=>u.pathname.startsWith('/auth/login')||u.hostname.includes('8080'),{timeout:20000}).catch(()=>{});
   check('sign out on Scalar page redirects to login', /\/auth\/login|openid-connect/.test(p.url()), p.url().slice(0,110));
 
-  // session must be gone: catalog API returns 401
+  // session must be gone: return to portal origin, catalog API must not serve data
+  await p.goto(BASE+'/',{waitUntil:'domcontentloaded'});
+  await p.waitForTimeout(1500);
   const st = await p.evaluate(async()=>{
     const r = await fetch('/api/v1/catalog',{credentials:'same-origin'});
     return r.status;
   });
-  check('portal session invalidated after sign out', st===401, 'status='+st);
+  check('portal session invalidated after sign out', st===401, 'status='+st+' url='+p.url().slice(0,80));
 
   const fails = results.filter(r=>!r).length;
   console.log('\n'+results.length+' checks, '+fails+' failed');
