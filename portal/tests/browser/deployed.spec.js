@@ -86,7 +86,9 @@ const cspViolations = [];
 
   // 7. Console/CSP
   const cspErrs = consoleErrors.filter(e => /Content Security Policy|Refused to|violates/i.test(e));
-  const jsErrs = consoleErrors.filter(e => !/Content Security Policy|Refused to|violates|favicon|Failed to load resource.*404/i.test(e));
+  // "Failed to load resource" console errors are HTTP statuses (incl. the
+  // expected anonymous 401), not JS exceptions — pageerror covers real throws.
+  const jsErrs = consoleErrors.filter(e => !e.startsWith('Failed to load resource') && !/Content Security Policy|Refused to|violates|favicon/i.test(e));
   check('no CSP violations', cspErrs.length === 0, cspErrs.slice(0,3).join(' | '));
   check('no JS exceptions', jsErrs.length === 0, jsErrs.slice(0,3).join(' | '));
 
