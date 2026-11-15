@@ -19,10 +19,6 @@
       "bytes": 41438,
       "sha256": "41fd88a5744f2b5bf5fad9330555e1b52c36142097c55a087ae3e8a33fa8b696"
     },
-    "specs/development/api-gateway/openapi.json": {
-      "bytes": 2852,
-      "sha256": "93469a58ffafc572599fe8f43719fac2379529a2448ae4afb35c960e9152156f"
-    },
     "specs/development/certification-service/openapi.json": {
       "bytes": 2879,
       "sha256": "7be0b9ef2c2a8eea68c36363623ad81a8b9e5c9fb23f4cdf5101db9c25099032"

@@ -400,28 +400,6 @@ services:
   description: Secure document storage, pre-signed upload/download URLs, optical character
     recognition, and retention.
 
-- id: api-gateway
-  name: "IAOP API Gateway"
-  repository: AGENTAPR/iaop-api-gateway
-  environment: development
-  visibility: public
-  maturity: proposed_contract
-  catalog: backend
-  boundedContext: "Integration & Platform"
-  lifecycle: proposed
-  implementationStatus: proposed
-  deploymentStatus: not_deployed
-  verificationStatus: not_verified
-  specPath: specs/development/api-gateway/openapi.json
-  sourceRef: development
-  sourceCommit: c26a33b330be0ab5209f7e988580a115f5e3973e
-  apiVersion: 0.1.0
-  enabled: true
-  domainOwner: Edge & Security Platform Team
-  serverUrl: https://api-dev.iaop.internal/api-gateway
-  description: Edge routing, rate limiting, TLS termination, API key validation, and
-    token verification.
-
 - id: customer-bff
   name: "AGENA Customer BFF"
   repository: AGENTAPR/agena-customer-web
