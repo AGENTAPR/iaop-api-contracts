@@ -218,8 +218,13 @@
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Accept': 'application/json' }
-        }).then(function () {
-          window.location.href = '/auth/login';
+        }).then(function (res) {
+          return res.json().catch(function () { return null; });
+        }).then(function (body) {
+          // Server returns the post-logout URL (Keycloak end_session when
+          // OIDC is configured); navigate the browser — fetch cannot follow
+          // the cross-origin redirect itself.
+          window.location.href = (body && body.logout_url) || '/';
         }).catch(function () {
           logoutBtn.disabled = false;
         });

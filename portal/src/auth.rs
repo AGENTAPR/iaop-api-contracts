@@ -491,13 +491,13 @@ pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Respon
         }
         _ => "/".to_string(),
     };
-    let mut resp = Redirect::to(&target).into_response();
-    let secure = secure_cookies(&state);
-    resp.headers_mut().append(
-        header::SET_COOKIE,
-        clear_cookie(SESSION_COOKIE, secure).parse().unwrap(),
-    );
-    resp
+    // Return JSON (not a redirect): fetch() cannot follow the cross-origin
+    // redirect to Keycloak, so the client navigates itself.
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "ok": true, "logout_url": target })),
+    )
+        .into_response()
 }
 
 pub fn session_from_headers(state: &AppState, headers: &HeaderMap) -> Option<PortalSession> {
