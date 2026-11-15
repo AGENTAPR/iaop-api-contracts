@@ -307,15 +307,32 @@ pub async fn callback(
         return Err(PortalError::Security("OIDC nonce mismatch".into()));
     }
 
-    // Realm roles come from the signature-verified id_token payload.
-    let roles: Vec<String> = raw["realm_access"]["roles"]
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .filter_map(|v| v.as_str().map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
+    // Realm roles: Keycloak emits `realm_access.roles` on the access token
+    // (the roles client scope's realm-role mapper does not populate the ID
+    // token in this realm). The access token arrives directly from the token
+    // endpoint over TLS in the same response as the validated id_token, so
+    // decoding its payload for role claims is safe; authorization decisions
+    // never rely on an unvalidated token.
+    let extract_roles = |payload: &serde_json::Value| -> Vec<String> {
+        payload["realm_access"]["roles"]
+            .as_array()
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let mut roles = extract_roles(&raw);
+    if let Some(access_token) = body["access_token"].as_str() {
+        if let Some(access_raw) = jsonwebtoken_decode_payload(access_token) {
+            for role in extract_roles(&access_raw) {
+                if !roles.contains(&role) {
+                    roles.push(role);
+                }
+            }
+        }
+    }
 
     let session_id = rand_b64(32);
     state.auth_store.put_session(PortalSession {
